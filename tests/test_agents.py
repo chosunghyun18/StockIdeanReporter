@@ -46,7 +46,7 @@ class TestIndustryAnalyst:
         assert len(saved_files) == 1
         assert saved_files[0].read_text(encoding="utf-8") == expected
 
-    def test_analyze_calls_claude_once(self):
+    def test_analyze_calls_claude_once(self, tmp_path):
         """Claude API 정확히 1회 호출."""
         mock_client = MagicMock()
         mock_client.messages.create.return_value = _anthropic_message("분석 결과")
@@ -60,7 +60,7 @@ class TestIndustryAnalyst:
         analyst.data_fetcher.get_sector.return_value = "Technology"
         analyst.data_fetcher.get_industry.return_value = "Consumer Electronics"
 
-        with patch("src.agents.industry_analyst._OUTPUT_DIR", Path("/tmp")):
+        with patch("src.agents.industry_analyst._OUTPUT_DIR", tmp_path):
             analyst.analyze("AAPL", market="US")
 
         mock_client.messages.create.assert_called_once()

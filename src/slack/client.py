@@ -70,10 +70,7 @@ class SlackClient:
             )
 
         blocks = self._build_blocks(report)
-        payload = {
-            "channel": self.channel,
-            "blocks": blocks,
-        }
+        payload = {"blocks": blocks}
 
         return self._send_with_retry(payload)
 
@@ -104,7 +101,7 @@ class SlackClient:
                 },
             },
         ]
-        return self._send_with_retry({"channel": self.channel, "blocks": blocks})
+        return self._send_with_retry({"blocks": blocks})
 
     def _build_blocks(self, report: dict[str, Any]) -> list[dict]:
         """Block Kit 블록 리스트 생성."""
@@ -206,11 +203,19 @@ class SlackClient:
         """
         for attempt in range(1, _MAX_RETRIES + 1):
             try:
+                http_proxy = (
+                    os.environ.get("HTTPS_PROXY")
+                    or os.environ.get("HTTP_PROXY")
+                    or os.environ.get("https_proxy")
+                    or os.environ.get("http_proxy")
+                )
+                proxies = {"http": http_proxy, "https": http_proxy} if http_proxy else None
                 resp = requests.post(
                     self.webhook_url,
                     data=json.dumps(payload),
                     headers={"Content-Type": "application/json"},
                     timeout=10,
+                    proxies=proxies,
                 )
 
                 if resp.status_code == 200:
