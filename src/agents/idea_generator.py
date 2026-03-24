@@ -35,6 +35,9 @@ class IdeaGenerator:
         ticker: str,
         industry_analysis: str,
         price_analysis: str,
+        peer_analysis: str = "",
+        sentiment_summary: str = "",
+        swing_context: str = "",
     ) -> str:
         """투자 아이디어 생성.
 
@@ -42,12 +45,18 @@ class IdeaGenerator:
             ticker: 종목 코드
             industry_analysis: 산업 분석 결과 텍스트
             price_analysis: 주가 분석 결과 텍스트
+            peer_analysis: 경쟁사 비교 분석 (선택)
+            sentiment_summary: 심리 지표 요약 (선택)
+            swing_context: 스크리너 선정 근거 / 스윙 매매 맥락 (선택)
 
         Returns:
             투자 아이디어 마크다운 문자열
         """
         today = date.today().strftime("%Y-%m-%d")
-        prompt = _build_idea_prompt(ticker, industry_analysis, price_analysis, today)
+        prompt = _build_idea_prompt(
+            ticker, industry_analysis, price_analysis, today,
+            peer_analysis, sentiment_summary, swing_context,
+        )
 
         logger.info("투자 아이디어 생성 시작: %s", ticker)
 
@@ -142,15 +151,33 @@ def _build_idea_prompt(
     industry_analysis: str,
     price_analysis: str,
     today: str,
+    peer_analysis: str = "",
+    sentiment_summary: str = "",
+    swing_context: str = "",
 ) -> str:
     """투자 아이디어 생성 프롬프트."""
-    return f"""당신은 전문 투자 분석가입니다. 아래 산업 분석과 주가 분석 결과를 종합하여 구체적인 투자 아이디어를 도출해 주세요.
+    extra_sections = ""
+    if swing_context:
+        extra_sections += f"\n=== 스크리닝 선정 근거 (스윙 매매 맥락) ===\n{swing_context}\n"
+    if peer_analysis:
+        extra_sections += f"\n=== 경쟁사 비교 분석 ===\n{peer_analysis}\n"
+    if sentiment_summary:
+        extra_sections += f"\n=== 시장 심리 지표 ===\n{sentiment_summary}\n"
+
+    swing_instruction = ""
+    if swing_context:
+        swing_instruction = (
+            "\n**스윙 매매 관점 필수 반영**: 보유 기간 3~20일을 기준으로 진입/청산 트리거 가격을 구체적으로 제시하고, "
+            "단기 촉매(catalyst)와 손절 기준을 명확히 하세요."
+        )
+
+    return f"""당신은 전문 투자 분석가입니다. 아래 분석 결과를 종합하여 구체적인 투자 아이디어를 도출해 주세요.{swing_instruction}
 
 === 산업 분석 결과 ===
 {industry_analysis}
 
 === 주가 분석 결과 ===
-{price_analysis}
+{price_analysis}{extra_sections}
 
 다음 형식으로 투자 아이디어를 작성해 주세요:
 

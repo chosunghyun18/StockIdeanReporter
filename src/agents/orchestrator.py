@@ -15,8 +15,10 @@ import anthropic
 
 from .idea_generator import IdeaGenerator
 from .industry_analyst import IndustryAnalyst
+from .peer_analyst import PeerAnalyst
 from .price_analyst import PriceAnalyst
 from .reporter import Reporter
+from .stock_screener import StockScreener, ScreeningResult
 
 logger = logging.getLogger(__name__)
 
@@ -61,11 +63,13 @@ class Orchestrator:
 
         self.industry_analyst = IndustryAnalyst(client=client)
         self.price_analyst = PriceAnalyst(client=client)
+        self.peer_analyst = PeerAnalyst(client=client)
         self.idea_generator = IdeaGenerator(client=client)
         self.reporter = Reporter(
             webhook_url=slack_webhook_url,
             channel=slack_channel,
         )
+        self.screener = StockScreener()
 
     def run(self, ticker: str, market: str = "KR") -> AnalysisResult:
         """전체 분석 파이프라인 실행.
@@ -137,6 +141,113 @@ class Orchestrator:
             investment_idea=investment_idea,
             slack_sent=slack_sent,
         )
+
+    def run_discovery(
+        self,
+        markets: list[str] | None = None,
+        top_n: int = 5,
+    ) -> list[AnalysisResult]:
+        """종목 자동 발굴 후 전체 분석 파이프라인 실행.
+
+        Args:
+            markets: 대상 시장 리스트 (None이면 ["KR", "US"])
+            top_n: 발굴 종목 수
+
+        Returns:
+            AnalysisResult 리스트 (발굴 종목 수만큼)
+        """
+        markets = markets or ["KR", "US"]
+        logger.info("자동 발굴 시작: %s (top %d)", markets, top_n)
+
+        screening: ScreeningResult = self.screener.screen(markets=markets, top_n=top_n)
+
+        if not screening.top_candidates:
+            logger.warning("스크리닝 결과 없음")
+            return []
+
+        results: list[AnalysisResult] = []
+        for candidate in screening.top_candidates:
+            ticker = candidate.drop.ticker
+            market = candidate.drop.market
+            swing_ctx = screening.swing_context(candidate)
+            logger.info("[%d/%d] 분석: %s", candidate.rank, top_n, ticker)
+            result = self._run_with_context(ticker, market, swing_ctx, candidate)
+            results.append(result)
+
+        logger.info("자동 발굴 완료: %d 종목 분석", len(results))
+        return results
+
+    def _run_with_context(
+        self,
+        ticker: str,
+        market: str,
+        swing_context: str,
+        candidate,
+    ) -> AnalysisResult:
+        """스크리닝 맥락을 포함한 단일 종목 분석."""
+        logger.info("분석 시작: %s (%s)", ticker, market)
+
+        industry_result, price_result, peer_result = self._run_triple_parallel(ticker, market)
+
+        if isinstance(industry_result, Exception) or isinstance(price_result, Exception):
+            error_msg = f"분석 실패: {industry_result if isinstance(industry_result, Exception) else price_result}"
+            self.reporter.send_error(ticker, error_msg)
+            return AnalysisResult(
+                ticker=ticker, market=market,
+                industry_analysis="", price_analysis="",
+                investment_idea="", slack_sent=False, error=error_msg,
+            )
+
+        peer_text = str(peer_result) if not isinstance(peer_result, Exception) else ""
+        sentiment_text = candidate.sentiment.summary if candidate.sentiment else ""
+
+        try:
+            investment_idea = self.idea_generator.generate(
+                ticker=ticker,
+                industry_analysis=str(industry_result),
+                price_analysis=str(price_result),
+                peer_analysis=peer_text,
+                sentiment_summary=sentiment_text,
+                swing_context=swing_context,
+            )
+        except Exception as e:
+            error_msg = f"아이디어 생성 실패: {e}"
+            self.reporter.send_error(ticker, error_msg)
+            return AnalysisResult(
+                ticker=ticker, market=market,
+                industry_analysis=str(industry_result),
+                price_analysis=str(price_result),
+                investment_idea="", slack_sent=False, error=error_msg,
+            )
+
+        report_fields = self.idea_generator.parse_report_fields(investment_idea, ticker)
+        slack_sent = self.reporter.send(ticker, report_fields)
+        logger.info("분석 완료: %s (Slack: %s)", ticker, "성공" if slack_sent else "실패")
+
+        return AnalysisResult(
+            ticker=ticker, market=market,
+            industry_analysis=str(industry_result),
+            price_analysis=str(price_result),
+            investment_idea=investment_idea,
+            slack_sent=slack_sent,
+        )
+
+    def _run_triple_parallel(
+        self, ticker: str, market: str
+    ) -> tuple[str | Exception, str | Exception, str | Exception]:
+        """산업/주가/경쟁사 분석 3개 병렬 실행."""
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+            f_industry = executor.submit(self.industry_analyst.analyze, ticker, market)
+            f_price = executor.submit(self.price_analyst.analyze, ticker, market)
+            f_peer = executor.submit(self.peer_analyst.analyze, ticker, market)
+
+            def _get(future):
+                try:
+                    return future.result(timeout=120)
+                except Exception as e:
+                    return e
+
+            return _get(f_industry), _get(f_price), _get(f_peer)
 
     def _run_parallel_analysis(
         self,
