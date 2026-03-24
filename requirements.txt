@@ -13,6 +13,9 @@ anthropic>=0.40.0
 # HTTP
 requests>=2.31.0
 
+# Slack Bot (메시지 수신 / Socket Mode)
+slack-bolt>=1.18.0
+
 # 데이터 처리
 pandas>=2.0.0
 numpy>=1.24.0
