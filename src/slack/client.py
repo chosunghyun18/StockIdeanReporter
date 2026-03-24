@@ -1,0 +1,238 @@
+"""Slack Webhook 클라이언트.
+
+Block Kit 포맷 변환 및 재시도 로직 포함.
+"""
+from __future__ import annotations
+
+import json
+import logging
+import os
+import time
+from typing import Any
+
+import requests
+
+logger = logging.getLogger(__name__)
+
+_MAX_RETRIES = 3
+_BACKOFF_BASE = 2.0  # 지수 백오프 기반
+
+
+class SlackClient:
+    """Slack Webhook 클라이언트."""
+
+    def __init__(
+        self,
+        webhook_url: str | None = None,
+        channel: str | None = None,
+    ) -> None:
+        """초기화.
+
+        Args:
+            webhook_url: Slack Webhook URL (None이면 환경변수 SLACK_WEBHOOK_URL 사용)
+            channel: 채널명 (None이면 환경변수 SLACK_CHANNEL 또는 #investment-ideas)
+        """
+        self.webhook_url = webhook_url or os.environ.get("SLACK_WEBHOOK_URL", "")
+        self.channel = channel or os.environ.get("SLACK_CHANNEL", "#investment-ideas")
+
+    def send_investment_report(self, report: dict[str, Any]) -> bool:
+        """투자 리포트를 Slack Block Kit 형식으로 전송.
+
+        Args:
+            report: 투자 리포트 딕셔너리 (아래 키 포함)
+                - ticker: 종목 코드
+                - name: 기업명
+                - date: 분석 날짜
+                - investment_type: 단기/중기/장기
+                - thesis: 투자 테제 문자열
+                - entry_price: 진입 가격대 문자열
+                - target1: 1차 목표가
+                - target2: 2차 목표가
+                - stop_loss: 손절가
+                - risk_reward: R/R 비율 문자열
+                - bull_case: 강세 시나리오
+                - base_case: 기본 시나리오
+                - bear_case: 약세 시나리오
+                - industry_score: 산업 매력도 (1-5)
+                - technical_signal: 기술적 신호
+                - valuation: 밸류에이션 평가
+                - opinion: 최종 투자 의견
+
+        Returns:
+            전송 성공 여부
+
+        Raises:
+            EnvironmentError: Webhook URL이 설정되지 않은 경우
+        """
+        if not self.webhook_url:
+            raise EnvironmentError(
+                "SLACK_WEBHOOK_URL 환경변수가 설정되지 않았습니다."
+            )
+
+        blocks = self._build_blocks(report)
+        payload = {
+            "channel": self.channel,
+            "blocks": blocks,
+        }
+
+        return self._send_with_retry(payload)
+
+    def send_error_notification(self, ticker: str, error_msg: str) -> bool:
+        """분석 실패 시 에러 알림 전송.
+
+        Args:
+            ticker: 종목 코드
+            error_msg: 오류 메시지
+
+        Returns:
+            전송 성공 여부
+        """
+        if not self.webhook_url:
+            logger.warning("SLACK_WEBHOOK_URL 미설정. 에러 알림 전송 불가.")
+            return False
+
+        blocks = [
+            {
+                "type": "header",
+                "text": {"type": "plain_text", "text": "⚠️ 분석 실패 알림"},
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"*종목:* {ticker}\n*오류:* {error_msg}",
+                },
+            },
+        ]
+        return self._send_with_retry({"channel": self.channel, "blocks": blocks})
+
+    def _build_blocks(self, report: dict[str, Any]) -> list[dict]:
+        """Block Kit 블록 리스트 생성."""
+        type_badge = {
+            "단기": "🔴 단기",
+            "중기": "🟡 중기",
+            "장기": "🟢 장기",
+        }.get(report.get("investment_type", ""), "⚪ 미분류")
+
+        industry_stars = "⭐" * int(report.get("industry_score", 3))
+
+        blocks: list[dict] = [
+            # 헤더
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": "📊 투자 아이디어 리포트",
+                },
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": (
+                        f"*{report.get('name', '')}* ({report.get('ticker', '')})  |  "
+                        f"{report.get('date', '')}  |  {type_badge}"
+                    ),
+                },
+            },
+            {"type": "divider"},
+            # 투자 테제
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"*📌 투자 테제*\n{report.get('thesis', '')}",
+                },
+            },
+            {"type": "divider"},
+            # 실행 계획
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": (
+                        f"*🎯 실행 계획*\n"
+                        f"진입: `{report.get('entry_price', 'N/A')}`  "
+                        f"목표1: `{report.get('target1', 'N/A')}`  "
+                        f"목표2: `{report.get('target2', 'N/A')}`  "
+                        f"손절: `{report.get('stop_loss', 'N/A')}`\n"
+                        f"R/R 비율: *{report.get('risk_reward', 'N/A')}*"
+                    ),
+                },
+            },
+            {"type": "divider"},
+            # 시나리오
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": (
+                        f"*📈 시나리오별 전망*\n"
+                        f"🟢 강세: {report.get('bull_case', 'N/A')}\n"
+                        f"🟡 기본: {report.get('base_case', 'N/A')}\n"
+                        f"🔴 약세: {report.get('bear_case', 'N/A')}"
+                    ),
+                },
+            },
+            {"type": "divider"},
+            # 푸터
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "mrkdwn",
+                        "text": (
+                            f"산업 매력도: {industry_stars}  |  "
+                            f"기술적: *{report.get('technical_signal', 'N/A')}*  |  "
+                            f"밸류에이션: *{report.get('valuation', 'N/A')}*\n"
+                            f"💡 {report.get('opinion', '')}  |  "
+                            f"_Generated by Claude Investment Agent_"
+                        ),
+                    }
+                ],
+            },
+        ]
+
+        return blocks
+
+    def _send_with_retry(self, payload: dict) -> bool:
+        """지수 백오프 재시도 전송.
+
+        Args:
+            payload: 전송할 페이로드
+
+        Returns:
+            전송 성공 여부
+        """
+        for attempt in range(1, _MAX_RETRIES + 1):
+            try:
+                resp = requests.post(
+                    self.webhook_url,
+                    data=json.dumps(payload),
+                    headers={"Content-Type": "application/json"},
+                    timeout=10,
+                )
+
+                if resp.status_code == 200:
+                    logger.info("Slack 전송 성공 (시도 %d)", attempt)
+                    return True
+
+                if resp.status_code == 429:
+                    # Rate limit
+                    retry_after = int(resp.headers.get("Retry-After", _BACKOFF_BASE**attempt))
+                    logger.warning("Slack Rate Limit. %d초 후 재시도", retry_after)
+                    time.sleep(retry_after)
+                else:
+                    logger.error(
+                        "Slack 전송 실패 (시도 %d): %d %s",
+                        attempt, resp.status_code, resp.text,
+                    )
+
+            except requests.RequestException as e:
+                logger.error("Slack 요청 오류 (시도 %d): %s", attempt, e)
+
+            if attempt < _MAX_RETRIES:
+                time.sleep(_BACKOFF_BASE**attempt)
+
+        logger.error("Slack 전송 최종 실패 (%d회 시도)", _MAX_RETRIES)
+        return False
