@@ -4,8 +4,10 @@
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
+import re
 from datetime import date
 from pathlib import Path
 
@@ -79,6 +81,9 @@ class IdeaGenerator:
     def parse_report_fields(self, idea_text: str, ticker: str) -> dict:
         """생성된 아이디어 텍스트에서 Slack 전송용 필드 추출.
 
+        idea_text 내 ```json ... ``` 블록을 우선 파싱하고,
+        없을 경우에만 Haiku API를 fallback으로 호출한다.
+
         Args:
             idea_text: 투자 아이디어 마크다운
             ticker: 종목 코드
@@ -88,6 +93,19 @@ class IdeaGenerator:
         """
         today = date.today().strftime("%Y-%m-%d")
 
+        # 1. 마크다운 내 JSON 블록 추출 시도 (API 호출 없이)
+        match = re.search(r"```json\s*(\{.*?\})\s*```", idea_text, re.DOTALL)
+        if match:
+            try:
+                data = json.loads(match.group(1))
+                data.setdefault("ticker", ticker)
+                data.setdefault("date", today)
+                return data
+            except json.JSONDecodeError:
+                pass
+
+        # 2. fallback: Haiku API 호출
+        logger.debug("JSON 블록 없음, Haiku API fallback: %s", ticker)
         prompt = f"""다음 투자 아이디어 보고서에서 정보를 추출하여 JSON으로 반환해 주세요.
 
 보고서:
@@ -120,7 +138,6 @@ class IdeaGenerator:
             messages=[{"role": "user", "content": prompt}],
         )
 
-        import json
         try:
             return json.loads(message.content[0].text)
         except (json.JSONDecodeError, IndexError):
@@ -211,4 +228,10 @@ def _build_idea_prompt(
 
 #### 투자 의견
 [최종 한 줄 요약]
+
+---
+마지막에 아래 JSON 블록을 반드시 포함하세요 (Slack 전송용):
+```json
+{{"name": "기업명", "ticker": "{ticker}", "date": "{today}", "investment_type": "단기|중기|장기", "thesis": "투자 테제 2-3문장", "entry_price": "진입 가격대", "target1": "1차 목표가", "target2": "2차 목표가", "stop_loss": "손절 기준", "risk_reward": "R/R 비율", "bull_case": "강세 시나리오 한 줄", "base_case": "기본 시나리오 한 줄", "bear_case": "약세 시나리오 한 줄", "industry_score": 3, "technical_signal": "매수|중립|매도", "valuation": "저평가|적정|고평가", "opinion": "최종 투자 의견 한 줄"}}
+```
 """

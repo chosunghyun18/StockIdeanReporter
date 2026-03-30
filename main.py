@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import logging
 import sys
 
@@ -33,6 +34,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="투자 분석 멀티 에이전트 시스템")
     parser.add_argument("--ticker", help="종목 코드 (예: 005930.KS, AAPL)")
     parser.add_argument(
+        "--tickers", nargs="+",
+        help="여러 종목 코드 병렬 분석 (예: --tickers AAPL UNH TQQQ QLD)",
+    )
+    parser.add_argument(
         "--market", nargs="+", choices=["KR", "US"], default=["KR"],
         help="시장 구분 (기본값: KR, --discover 시 복수 가능)",
     )
@@ -46,13 +51,16 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    if not args.discover and not args.ticker:
-        parser.error("--ticker 또는 --discover 중 하나를 지정하세요.")
+    if not args.discover and not args.ticker and not args.tickers:
+        parser.error("--ticker, --tickers, 또는 --discover 중 하나를 지정하세요.")
 
     orchestrator = Orchestrator()
 
     if args.discover:
         return _run_discovery(orchestrator, args.market, args.top_n)
+
+    if args.tickers:
+        return _run_parallel(orchestrator, args.tickers, args.market[0])
 
     return _run_single(orchestrator, args.ticker, args.market[0])
 
@@ -83,6 +91,22 @@ def _run_single(orchestrator: Orchestrator, ticker: str, market: str) -> int:
     idea = result.investment_idea
     print(idea[:500] + "..." if len(idea) > 500 else idea)
     return 0
+
+
+def _run_parallel(orchestrator: Orchestrator, tickers: list[str], market: str) -> int:
+    """여러 종목 병렬 분석."""
+    logger.info("병렬 분석 시작: %s (%s)", tickers, market)
+
+    def _analyze(ticker: str):
+        return _run_single(orchestrator, ticker, market)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(tickers)) as executor:
+        futures = {executor.submit(_analyze, t): t for t in tickers}
+        exit_codes = [f.result() for f in concurrent.futures.as_completed(futures)]
+
+    failed = sum(1 for c in exit_codes if c != 0)
+    logger.info("병렬 분석 완료: %d/%d 성공", len(tickers) - failed, len(tickers))
+    return 1 if failed else 0
 
 
 def _run_discovery(orchestrator: Orchestrator, markets: list[str], top_n: int) -> int:

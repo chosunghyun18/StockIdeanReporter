@@ -4,6 +4,7 @@
 """
 from __future__ import annotations
 
+import concurrent.futures
 import logging
 import os
 from datetime import date
@@ -55,11 +56,16 @@ class PriceAnalyst:
         """
         today = date.today().strftime("%Y-%m-%d")
 
-        # 데이터 수집
-        stock_info = self.stock_fetcher.get_stock_info(ticker)
-        price_history = self.stock_fetcher.get_price_history(ticker, period_days=365)
-        fundamental_data = self.financial_fetcher.get_fundamentals(ticker)
-        sector = self.stock_fetcher.get_sector(ticker)
+        # 데이터 수집 (병렬)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            f_info = executor.submit(self.stock_fetcher.get_stock_info, ticker)
+            f_history = executor.submit(self.stock_fetcher.get_price_history, ticker, 365)
+            f_fund = executor.submit(self.financial_fetcher.get_fundamentals, ticker)
+            f_sector = executor.submit(self.stock_fetcher.get_sector, ticker)
+            stock_info = f_info.result()
+            price_history = f_history.result()
+            fundamental_data = f_fund.result()
+            sector = f_sector.result()
 
         # 분석 수행
         tech_signals = self.tech_analyzer.analyze(price_history.df)

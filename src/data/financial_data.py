@@ -10,6 +10,8 @@ from typing import Optional
 
 import yfinance as yf
 
+from src.data.stock_data import _fetch_yf_info
+
 
 @dataclass(frozen=True)
 class FundamentalData:
@@ -57,7 +59,7 @@ class FinancialDataFetcher:
             ValueError: 데이터를 가져올 수 없는 경우
         """
         try:
-            info = yf.Ticker(ticker).info
+            info = _fetch_yf_info(ticker)
         except Exception as e:
             raise ValueError(f"재무 데이터 조회 실패: {ticker}, {e}") from e
 

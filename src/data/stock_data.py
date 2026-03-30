@@ -4,12 +4,19 @@ yfinance (국내/해외), FinanceDataReader (국내 보조) 활용.
 """
 from __future__ import annotations
 
+import functools
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional
 
 import pandas as pd
 import yfinance as yf
+
+
+@functools.lru_cache(maxsize=256)
+def _fetch_yf_info(ticker: str) -> dict:
+    """yfinance .info 캐시 (프로세스 내 동일 종목 재호출 방지)."""
+    return yf.Ticker(ticker).info
 
 
 @dataclass(frozen=True)
@@ -55,8 +62,7 @@ class StockDataFetcher:
         Raises:
             ValueError: 종목 정보를 가져올 수 없는 경우
         """
-        stock = yf.Ticker(ticker)
-        info = stock.info
+        info = _fetch_yf_info(ticker)
 
         if not info or "regularMarketPrice" not in info and "currentPrice" not in info:
             raise ValueError(f"종목 정보를 가져올 수 없습니다: {ticker}")
@@ -129,7 +135,7 @@ class StockDataFetcher:
             섹터 문자열 (정보 없으면 'Unknown')
         """
         try:
-            info = yf.Ticker(ticker).info
+            info = _fetch_yf_info(ticker)
             return info.get("sector") or info.get("sectorDisp") or "Unknown"
         except Exception:
             return "Unknown"
@@ -144,7 +150,7 @@ class StockDataFetcher:
             산업 문자열 (정보 없으면 'Unknown')
         """
         try:
-            info = yf.Ticker(ticker).info
+            info = _fetch_yf_info(ticker)
             return info.get("industry") or info.get("industryDisp") or "Unknown"
         except Exception:
             return "Unknown"
