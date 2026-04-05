@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>요청 히스토리 — Agent Viewer</title>
+<style>
+  :root {
+    --bg:       #0d0f18;
+    --surface:  #13161f;
+    --surface2: #1a1d2e;
+    --border:   #252840;
+    --text:     #e2e4f0;
+    --muted:    #5a607a;
+    --accent:   #6c63ff;
+    --accent2:  #06b6d4;
+    --success:  #10b981;
+    --warn:     #f59e0b;
+    --orange:   #f97316;
+
+    --c-orchestrator: #f59e0b;
+    --c-analyst:      #3b82f6;
+    --c-reviewer:     #10b981;
+    --c-etf:          #06b6d4;
+    --c-reporter:     #a78bfa;
+    --c-builder:      #f97316;
+    --c-other:        #4b5563;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 13px;
+  }
+
+  .app { display: flex; flex-direction: column; height: 100vh; }
+
+  /* ── Header ── */
+  header {
+    height: 48px; display: flex; align-items: center; gap: 16px;
+    padding: 0 20px; background: var(--surface);
+    border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .logo { font-size: 16px; font-weight: 700; }
+  .logo span { color: var(--accent); }
+  .nav-link {
+    font-size: 12px; color: var(--muted); text-decoration: none;
+    padding: 4px 10px; border-radius: 6px; transition: all 0.15s;
+  }
+  .nav-link:hover, .nav-link.active {
+    color: var(--text); background: var(--border);
+  }
+  .hdr-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .hdr-badge {
+    font-size: 11px; color: var(--muted);
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 2px 10px;
+  }
+
+  /* ── Body layout ── */
+  .body { flex: 1; display: flex; overflow: hidden; }
+
+  /* ── Session list (left) ── */
+  .session-list {
+    width: 320px; flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+
+  .list-header {
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .list-title {
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.6px; text-transform: uppercase; color: var(--muted);
+  }
+  .list-hint { font-size: 10px; color: var(--muted); opacity: 0.6; }
+
+  .list-scroll { flex: 1; overflow-y: auto; padding: 8px; }
+
+  .session-item {
+    padding: 10px 12px; border-radius: 8px; cursor: pointer;
+    margin-bottom: 4px;
+    border: 1px solid transparent;
+    transition: all 0.15s;
+  }
+  .session-item:hover { background: var(--surface2); }
+  .session-item.active {
+    background: rgba(108,99,255,0.12);
+    border-color: rgba(108,99,255,0.4);
+  }
+
+  .si-time {
+    font-size: 10px; color: var(--muted); margin-bottom: 4px;
+    font-family: 'SF Mono', monospace;
+  }
+  .si-prompt {
+    font-size: 12px; color: var(--text); line-height: 1.4;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-bottom: 6px;
+  }
+  .session-item.active .si-prompt { color: #c4b5fd; }
+
+  .si-agents {
+    display: flex; flex-wrap: wrap; gap: 4px;
+  }
+  .si-agent-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    display: inline-block;
+  }
+
+  .empty-state {
+    text-align: center; padding: 40px 20px; color: var(--muted);
+    font-size: 12px; line-height: 1.8;
+  }
+  .empty-icon { font-size: 32px; margin-bottom: 12px; }
+
+  /* ── Right panel ── */
+  .right-panel {
+    flex: 1; display: flex; flex-direction: column; overflow: hidden;
+  }
+
+  /* ── Detail header ── */
+  .detail-header {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    min-height: 72px;
+    display: flex; align-items: flex-start; gap: 12px;
+  }
+  .detail-prompt-icon { font-size: 18px; margin-top: 2px; flex-shrink: 0; }
+  .detail-prompt-wrap { flex: 1; }
+  .detail-prompt-label { font-size: 10px; color: var(--muted); margin-bottom: 4px; letter-spacing: 0.5px; }
+  .detail-prompt-text {
+    font-size: 13px; color: var(--text); line-height: 1.5;
+    max-height: 64px; overflow: hidden;
+  }
+  .detail-time { font-size: 10px; color: var(--muted); font-family: 'SF Mono', monospace; white-space: nowrap; margin-top: 2px; }
+
+  /* ── Agent grid (main area) ── */
+  .agent-canvas {
+    flex: 1; overflow-y: auto; padding: 24px;
+    display: flex; flex-direction: column; gap: 28px;
+  }
+
+  .pipeline-group {
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .pipeline-group-label {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.8px;
+    text-transform: uppercase; color: var(--muted);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .pipeline-group-label::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+
+  .agent-row {
+    display: flex; flex-wrap: wrap; gap: 10px;
+  }
+
+  .agent-card {
+    background: var(--surface2);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    min-width: 148px;
+    max-width: 220px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    position: relative;
+    opacity: 0.4;
+  }
+
+  .agent-card.active {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+
+  .agent-card.active::before {
+    content: '';
+    position: absolute;
+    inset: -1.5px;
+    border-radius: 11px;
+    border: 1.5px solid var(--card-color, var(--accent));
+    box-shadow: 0 0 16px color-mix(in srgb, var(--card-color, var(--accent)) 40%, transparent);
+    pointer-events: none;
+  }
+
+  .ac-name {
+    font-size: 12px; font-weight: 600; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-bottom: 3px;
+  }
+  .agent-card.active .ac-name { color: #c4b5fd; }
+
+  .ac-desc {
+    font-size: 10px; color: var(--muted); line-height: 1.4;
+    display: -webkit-box; -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical; overflow: hidden;
+  }
+
+  .ac-badge {
+    position: absolute; top: 8px; right: 8px;
+    font-size: 9px; font-weight: 700;
+    background: var(--card-color, var(--accent));
+    color: #fff; border-radius: 4px; padding: 1px 5px;
+    opacity: 0; transition: opacity 0.2s;
+  }
+  .agent-card.active .ac-badge { opacity: 1; }
+
+  /* ── Placeholder when nothing selected ── */
+  .select-hint {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 12px; color: var(--muted);
+  }
+  .select-hint-icon { font-size: 40px; }
+  .select-hint-text { font-size: 13px; line-height: 1.8; text-align: center; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div class="logo">Agent <span>Viewer</span></div>
+    <a class="nav-link" href="/">에이전트 목록</a>
+    <a class="nav-link" href="/graph">플로우 맵</a>
+    <a class="nav-link active" href="/sessions">요청 히스토리</a>
+    <div class="hdr-right">
+      <div class="hdr-badge" id="countBadge">로딩 중…</div>
+    </div>
+  </header>
+
+  <div class="body">
+    <!-- ── Session list ── -->
+    <aside class="session-list">
+      <div class="list-header">
+        <div class="list-title">터미널 요청</div>
+        <div class="list-hint">클릭 → 에이전트 확인</div>
+      </div>
+      <div class="list-scroll" id="sessionList"></div>
+    </aside>
+
+    <!-- ── Right panel ── -->
+    <div class="right-panel">
+      <div class="detail-header" id="detailHeader">
+        <div class="select-hint" style="flex-direction:row;align-items:center;gap:8px;width:100%">
+          <span style="font-size:20px">←</span>
+          <span style="font-size:12px;color:var(--muted)">왼쪽에서 요청을 선택하면 어떤 에이전트가 호출됐는지 표시됩니다.</span>
+        </div>
+      </div>
+      <div class="agent-canvas" id="agentCanvas">
+        <div class="select-hint">
+          <div class="select-hint-icon">🔍</div>
+          <div class="select-hint-text">
+            요청을 선택하세요<br>
+            <span style="font-size:11px;opacity:0.6">Claude Code 사용 중 호출된 에이전트가 하이라이트됩니다</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Agent metadata ──────────────────────────────────────────────────────────
+const PIPELINE_GROUPS = [
+  {
+    id: 'investment',
+    label: '투자 분석 파이프라인',
+    color: '#6c63ff',
+    agents: [
+      { slug: 'orchestrator',          name: 'orchestrator',          type: 'orchestrator', desc: '투자 분석 총괄 조율자' },
+      { slug: 'market-bias-analyst',   name: 'market-bias-analyst',   type: 'analyst',      desc: '시장 레짐 분석' },
+      { slug: 'industry-analyst',      name: 'industry-analyst',      type: 'analyst',      desc: '산업/섹터 분석' },
+      { slug: 'price-analyst',         name: 'price-analyst',         type: 'analyst',      desc: '주가 기술/기본 분석' },
+      { slug: 'idea-generator',        name: 'idea-generator',        type: 'analyst',      desc: '투자 아이디어 생성' },
+      { slug: 'etf-manager',           name: 'etf-manager',           type: 'etf',          desc: 'ETF 서브 오케스트레이터' },
+      { slug: 'leveraged-etf-analyst', name: 'leveraged-etf-analyst', type: 'etf',          desc: '레버리지/인버스 ETF 분석' },
+      { slug: 'thematic-etf-analyst',  name: 'thematic-etf-analyst',  type: 'etf',          desc: '테마 ETF 분석' },
+      { slug: 'etf-launch-monitor',    name: 'etf-launch-monitor',    type: 'etf',          desc: '신규 ETF 출시 모니터링' },
+      { slug: 'reporter',              name: 'reporter',              type: 'reporter',     desc: 'Slack 리포트 전송' },
+      { slug: 'stock-screener',        name: 'stock-screener',        type: 'analyst',      desc: '스윙 매매 종목 발굴' },
+    ]
+  },
+  {
+    id: 'it',
+    label: 'IT 개발 파이프라인',
+    color: '#f97316',
+    agents: [
+      { slug: 'it-orchestrator',  name: 'it-orchestrator',  type: 'orchestrator', desc: 'IT 개발 파이프라인 총괄' },
+      { slug: 'tech-explorer',    name: 'tech-explorer',    type: 'analyst',      desc: '기술 후보군 탐색' },
+      { slug: 'tech-researcher',  name: 'tech-researcher',  type: 'analyst',      desc: '선택 기술 심층 조사' },
+      { slug: 'service-designer', name: 'service-designer', type: 'builder',      desc: '아키텍처 & API 설계' },
+      { slug: 'service-builder',  name: 'service-builder',  type: 'builder',      desc: '코드 구현' },
+      { slug: 'qa-engineer',      name: 'qa-engineer',      type: 'reviewer',     desc: '테스트 & 품질 보증' },
+      { slug: 'security-dev',     name: 'security-dev',     type: 'reviewer',     desc: '보안 취약점 분석' },
+    ]
+  },
+  {
+    id: 'code',
+    label: '코드 리뷰 & 개발 도구',
+    color: '#10b981',
+    agents: [
+      { slug: 'planner',          name: 'planner',          type: 'other',    desc: '구현 계획 수립' },
+      { slug: 'code-reviewer',    name: 'code-reviewer',    type: 'reviewer', desc: '코드 품질 검토' },
+      { slug: 'security-reviewer',name: 'security-reviewer',type: 'reviewer', desc: '보안 취약점 스캔' },
+      { slug: 'python-reviewer',  name: 'python-reviewer',  type: 'reviewer', desc: 'Python 코드 리뷰' },
+      { slug: 'architect',        name: 'architect',        type: 'other',    desc: '시스템 아키텍처 설계' },
+      { slug: 'tdd-guide',        name: 'tdd-guide',        type: 'other',    desc: 'TDD 가이드' },
+      { slug: 'refactor-cleaner', name: 'refactor-cleaner', type: 'other',    desc: '코드 리팩토링' },
+    ]
+  }
+]
+
+const TYPE_COLOR = {
+  orchestrator: '#f59e0b',
+  analyst:      '#3b82f6',
+  reviewer:     '#10b981',
+  etf:          '#06b6d4',
+  reporter:     '#a78bfa',
+  builder:      '#f97316',
+  other:        '#4b5563',
+}
+
+// ── State ────────────────────────────────────────────────────────────────────
+let sessions = []
+let activeSession = null
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function formatTime(iso) {
+  try {
+    const d = new Date(iso)
+    return d.toLocaleString('ko-KR', {
+      month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit'
+    })
+  } catch { return iso }
+}
+
+function agentColor(type) {
+  return TYPE_COLOR[type] || TYPE_COLOR.other
+}
+
+// ── Render session list ──────────────────────────────────────────────────────
+function renderList() {
+  const el = document.getElementById('sessionList')
+
+  if (!sessions.length) {
+    el.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">📭</div>
+        아직 기록된 요청이 없습니다.<br><br>
+        Claude Code 터미널에서 에이전트를 사용하면<br>
+        여기에 자동으로 기록됩니다.
+      </div>`
+    return
+  }
+
+  el.innerHTML = sessions.map((s, i) => {
+    const dots = (s.agents || []).map(slug => {
+      const ag = findAgent(slug)
+      const col = agentColor(ag?.type || 'other')
+      return `<span class="si-agent-dot" style="background:${col}" title="${slug}"></span>`
+    }).join('')
+
+    return `
+      <div class="session-item" data-idx="${i}" onclick="selectSession(${i})">
+        <div class="si-time">${formatTime(s.timestamp)}</div>
+        <div class="si-prompt">${esc(s.prompt)}</div>
+        <div class="si-agents">${dots}</div>
+      </div>`
+  }).join('')
+}
+
+// ── Select session ────────────────────────────────────────────────────────────
+function selectSession(idx) {
+  activeSession = sessions[idx]
+
+  // Update list highlight
+  document.querySelectorAll('.session-item').forEach((el, i) => {
+    el.classList.toggle('active', i === idx)
+  })
+
+  renderDetail(activeSession)
+}
+
+// ── Render detail ─────────────────────────────────────────────────────────────
+function renderDetail(session) {
+  const activeSet = new Set(session.agents || [])
+
+  // Header
+  document.getElementById('detailHeader').innerHTML = `
+    <div class="detail-prompt-icon">💬</div>
+    <div class="detail-prompt-wrap">
+      <div class="detail-prompt-label">터미널 입력</div>
+      <div class="detail-prompt-text">${esc(session.prompt)}</div>
+    </div>
+    <div>
+      <div class="detail-time">${formatTime(session.timestamp)}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:3px;text-align:right">${activeSet.size}개 에이전트</div>
+    </div>
+  `
+
+  // Agent canvas
+  const canvas = document.getElementById('agentCanvas')
+  canvas.innerHTML = ''
+
+  PIPELINE_GROUPS.forEach(group => {
+    // Check if any agent in this group was called
+    const hasActive = group.agents.some(a => activeSet.has(a.slug))
+
+    const groupEl = document.createElement('div')
+    groupEl.className = 'pipeline-group'
+
+    groupEl.innerHTML = `
+      <div class="pipeline-group-label" style="color:${hasActive ? group.color : 'var(--muted)'}">
+        ${group.label} ${hasActive ? `<span style="font-size:9px;background:${group.color};color:#fff;border-radius:4px;padding:1px 6px;margin-left:4px">${group.agents.filter(a=>activeSet.has(a.slug)).length}개 호출</span>` : ''}
+      </div>
+      <div class="agent-row">
+        ${group.agents.map(agent => {
+          const isActive = activeSet.has(agent.slug)
+          const color = agentColor(agent.type)
+          return `
+            <div class="agent-card${isActive ? ' active' : ''}"
+                 style="${isActive ? `--card-color:${color}` : ''}"
+                 onclick="openAgent('${agent.slug}')">
+              <div class="ac-badge">호출됨</div>
+              <div class="ac-name">${esc(agent.name)}</div>
+              <div class="ac-desc">${esc(agent.desc)}</div>
+            </div>`
+        }).join('')}
+      </div>
+    `
+    canvas.appendChild(groupEl)
+  })
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function findAgent(slug) {
+  for (const g of PIPELINE_GROUPS) {
+    const a = g.agents.find(a => a.slug === slug)
+    if (a) return a
+  }
+  return null
+}
+
+function openAgent(slug) {
+  window.open(`/?agent=${slug}`, '_blank')
+}
+
+function esc(s) {
+  return String(s || '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+// ── Load & Init ──────────────────────────────────────────────────────────────
+async function load() {
+  try {
+    const res = await fetch('/api/sessions')
+    sessions = await res.json()
+  } catch (e) {
+    sessions = []
+  }
+
+  const badge = document.getElementById('countBadge')
+  badge.textContent = sessions.length
+    ? `${sessions.length}개 요청 기록`
+    : '기록 없음'
+
+  renderList()
+
+  // Auto-select first if available
+  if (sessions.length) selectSession(0)
+}
+
+load()
+
+// Auto-refresh every 30s
+setInterval(async () => {
+  const prevLen = sessions.length
+  try {
+    const res = await fetch('/api/sessions')
+    sessions = await res.json()
+  } catch {}
+  if (sessions.length !== prevLen) {
+    renderList()
+    document.getElementById('countBadge').textContent = `${sessions.length}개 요청 기록`
+  }
+}, 30000)
+</script>
+</body>
+</html>

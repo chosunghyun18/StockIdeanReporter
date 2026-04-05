@@ -1,0 +1,66 @@
+{
+  "sandbox": {
+    "enabled": true,
+    "network": {
+      "allowedDomains": [
+        "github.com",
+        "*.github.com",
+        "pypi.org",
+        "*.pypi.org",
+        "files.pythonhosted.org",
+        "api.anthropic.com",
+        "hooks.slack.com",
+        "finance.yahoo.com",
+        "query1.finance.yahoo.com",
+        "query2.finance.yahoo.com",
+        "data.krx.co.kr",
+        "kind.krx.co.kr"
+      ]
+    }
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git *)",
+      "Bash(pip *)",
+      "Bash(pip3 *)",
+      "Bash(python *)",
+      "Bash(python3 *)",
+      "Bash(curl *)",
+      "WebSearch"
+    ]
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node hooks/scripts/investment-skill-router.js"
+          }
+        ],
+        "description": "자동 스킬 라우터: 프롬프트 키워드 기반 관련 매뉴얼 안내 (작업 전)"
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node hooks/scripts/investment-quality-check.js",
+            "async": true,
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "node hooks/scripts/session-tracker.js",
+            "async": true,
+            "timeout": 10
+          }
+        ],
+        "description": "투자 분석 프로젝트 품질 체크리스트 + 세션 로그 저장"
+      }
+    ]
+  }
+}

@@ -1,0 +1,64 @@
+name: 투자 분석 자동 실행
+
+on:
+  schedule:
+    # 매일 오전 8시 KST (= UTC 전날 23:00)
+    - cron: '0 23 * * *'
+  workflow_dispatch:
+    # 수동 실행 버튼 (GitHub Actions 탭에서 바로 실행 가능)
+    inputs:
+      tickers:
+        description: '분석할 종목 (공백 구분)'
+        required: false
+        default: 'IONQ RKLB ASTS SOUN MSTR'
+      market:
+        description: '시장 (KR 또는 US)'
+        required: false
+        default: 'US'
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 의존성 설치
+        run: pip install -r requirements.txt
+
+      - name: output 디렉터리 생성
+        run: mkdir -p output
+
+      - name: 투자 분석 실행 (스케줄)
+        if: github.event_name == 'schedule'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
+        run: |
+          python main.py --tickers IONQ RKLB ASTS SOUN MSTR --market US
+
+      - name: 투자 분석 실행 (수동)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
+        run: |
+          python main.py --tickers ${{ github.event.inputs.tickers }} --market ${{ github.event.inputs.market }}
+
+      - name: 분석 결과 아티팩트 저장
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: analysis-${{ github.run_number }}-${{ github.run_attempt }}
+          path: output/
+          retention-days: 30

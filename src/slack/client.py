@@ -158,6 +158,19 @@ class SlackClient:
 
         return self._send_with_retry({"blocks": blocks})
 
+    def send_blocks(self, blocks: list[dict]) -> bool:
+        """임의의 Block Kit 블록 리스트를 전송.
+
+        Args:
+            blocks: Slack Block Kit 블록 리스트
+
+        Returns:
+            전송 성공 여부
+        """
+        if not self.webhook_url:
+            raise EnvironmentError("SLACK_WEBHOOK_URL 환경변수가 설정되지 않았습니다.")
+        return self._send_with_retry({"blocks": blocks})
+
     def _build_blocks(self, report: dict[str, Any]) -> list[dict]:
         """Block Kit 블록 리스트 생성."""
         type_badge = {

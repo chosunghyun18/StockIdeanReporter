@@ -1,0 +1,63 @@
+{
+  "pipelines": [
+    {
+      "id": "stock",
+      "label": "A. 개별 종목 분석",
+      "description": "시장 레짐 → 산업/주가 병렬 → 아이디어 → Slack",
+      "color": "#6c63ff",
+      "steps": [
+        {"agents": ["market-bias-analyst"], "parallel": false, "label": ""},
+        {"agents": ["industry-analyst", "price-analyst"], "parallel": true, "label": "병렬 분석"},
+        {"agents": ["idea-generator"], "parallel": false, "label": "통합"},
+        {"agents": ["reporter"], "parallel": false, "label": "전송"}
+      ]
+    },
+    {
+      "id": "etf",
+      "label": "B. ETF 일간 분석",
+      "description": "레짐 확인 → ETF 매니저 → 레버리지/테마 병렬 → 리포트",
+      "color": "#06b6d4",
+      "steps": [
+        {"agents": ["market-bias-analyst"], "parallel": false, "label": ""},
+        {"agents": ["etf-manager"], "parallel": false, "label": "ETF 오케스트레이터"},
+        {"agents": ["leveraged-etf-analyst", "thematic-etf-analyst"], "parallel": true, "label": "병렬 ETF 분석"},
+        {"agents": ["reporter"], "parallel": false, "label": "통합 전송"}
+      ]
+    },
+    {
+      "id": "etf_weekly",
+      "label": "C. 신규 ETF 모니터링",
+      "description": "주간 ETF 출시 모니터링 및 신규 기회 포착",
+      "color": "#f59e0b",
+      "steps": [
+        {"agents": ["market-bias-analyst"], "parallel": false, "label": ""},
+        {"agents": ["etf-manager"], "parallel": false, "label": "ETF 오케스트레이터"},
+        {"agents": ["etf-launch-monitor"], "parallel": false, "label": "신규 ETF 스캔"},
+        {"agents": ["reporter"], "parallel": false, "label": "전송"}
+      ]
+    },
+    {
+      "id": "bias",
+      "label": "D. 시장 바이어스",
+      "description": "빠른 시장 레짐 확인",
+      "color": "#10b981",
+      "steps": [
+        {"agents": ["market-bias-analyst"], "parallel": false, "label": ""}
+      ]
+    },
+    {
+      "id": "it",
+      "label": "E. IT 서비스 개발",
+      "description": "기술 탐색 → 설계 → 구현 → QA/보안 병렬",
+      "color": "#f97316",
+      "steps": [
+        {"agents": ["it-orchestrator"], "parallel": false, "label": ""},
+        {"agents": ["tech-explorer"], "parallel": false, "label": "기술 탐색"},
+        {"agents": ["tech-researcher"], "parallel": false, "label": "심층 조사"},
+        {"agents": ["service-designer"], "parallel": false, "label": "설계"},
+        {"agents": ["service-builder"], "parallel": false, "label": "구현"},
+        {"agents": ["qa-engineer", "security-dev"], "parallel": true, "label": "검증"}
+      ]
+    }
+  ]
+}

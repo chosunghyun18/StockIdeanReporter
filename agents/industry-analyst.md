@@ -1,8 +1,10 @@
 ---
 name: industry-analyst
-description: 산업/섹터 분석 전문 에이전트. 거시경제 흐름, 섹터 트렌드, 경쟁사 포지셔닝을 분석한다. orchestrator에 의해 호출됨.
+description: 산업/섹터 분석 전문 에이전트. 거시경제 흐름, 섹터 트렌드, 경쟁사 포지셔닝을 분석한다.
 tools: ["Read", "Write", "Bash", "WebSearch"]
 model: sonnet
+inputs: []
+outputs: [output/industry_analysis_{ticker}_{date}.md]
 ---
 
 # 산업 분석 에이전트

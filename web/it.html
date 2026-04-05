@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IT Pipeline Visualizer</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3348;
+    --text: #e2e8f0;
+    --text-muted: #64748b;
+    --accent: #6c63ff;
+    --accent2: #06b6d4;
+    --success: #10b981;
+    --warn: #f59e0b;
+    --danger: #ef4444;
+    --node-inactive: #1e2235;
+    --node-border-inactive: #2e3348;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  header a {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 13px;
+  }
+  header a:hover { color: var(--text); }
+  header .sep { color: var(--border); }
+  header h1 { font-size: 15px; font-weight: 600; color: var(--text); }
+
+  /* ── Layout ── */
+  .layout {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── Left Panel ── */
+  .left-panel {
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .panel-title {
+    padding: 16px 20px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* request input */
+  .request-area {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .request-input-wrap {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+  }
+
+  textarea#request-input {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    padding: 10px 12px;
+    resize: none;
+    height: 64px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  textarea#request-input:focus { border-color: var(--accent); }
+  textarea#request-input::placeholder { color: var(--text-muted); }
+
+  button#analyze-btn {
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 10px 14px;
+    height: 64px;
+    width: 64px;
+    transition: background 0.2s, transform 0.1s;
+  }
+  button#analyze-btn:hover { background: #7c75ff; }
+  button#analyze-btn:active { transform: scale(0.96); }
+
+  /* chips */
+  .chip-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .chip {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+    padding: 5px 12px;
+    transition: all 0.15s;
+  }
+  .chip:hover { border-color: var(--accent); color: var(--text); }
+  .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* active agents list */
+  .active-list {
+    padding: 16px 20px;
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .active-list-title {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .agent-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin-bottom: 6px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .agent-row:hover { background: var(--surface2); }
+  .agent-row.active {
+    background: rgba(108, 99, 255, 0.12);
+    border-color: rgba(108, 99, 255, 0.4);
+  }
+  .agent-row.active .agent-row-name { color: #a78bfa; }
+
+  .agent-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+    flex-shrink: 0;
+    transition: background 0.3s;
+  }
+  .agent-row.active .agent-dot {
+    background: var(--accent);
+    box-shadow: 0 0 6px var(--accent);
+  }
+
+  .agent-row-name {
+    font-size: 13px;
+    color: var(--text-muted);
+    flex: 1;
+    transition: color 0.2s;
+  }
+
+  .agent-row-role {
+    font-size: 11px;
+    color: var(--text-muted);
+    opacity: 0.6;
+  }
+
+  .agent-row-badge {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: rgba(108, 99, 255, 0.2);
+    color: #a78bfa;
+    display: none;
+  }
+  .agent-row.active .agent-row-badge { display: block; }
+
+  /* ── Right Panel ── */
+  .right-panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* pipeline canvas */
+  .pipeline-canvas {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    padding: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .pipeline-flow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    width: 100%;
+    max-width: 700px;
+  }
+
+  .pipeline-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    position: relative;
+  }
+
+  /* connector lines */
+  .connector-v {
+    width: 2px;
+    height: 28px;
+    background: var(--border);
+    transition: background 0.4s;
+    margin: 0 auto;
+  }
+  .connector-v.lit { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+
+  .connector-h-group {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    width: 100%;
+    height: 28px;
+  }
+
+  .connector-h-group .branch-line {
+    position: absolute;
+    top: 50%;
+    height: 2px;
+    background: var(--border);
+    transform: translateY(-50%);
+    transition: background 0.4s;
+  }
+  .connector-h-group .branch-line.lit { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+
+  .connector-h-group .down-left {
+    position: absolute;
+    top: 50%;
+    width: 2px;
+    height: 14px;
+    background: var(--border);
+    transform: translateY(0);
+    transition: background 0.4s;
+  }
+  .connector-h-group .down-left.lit { background: var(--accent); }
+  .connector-h-group .down-right {
+    position: absolute;
+    top: 50%;
+    width: 2px;
+    height: 14px;
+    background: var(--border);
+    transform: translateY(0);
+    transition: background 0.4s;
+  }
+  .connector-h-group .down-right.lit { background: var(--accent); }
+
+  /* agent node */
+  .agent-node {
+    background: var(--node-inactive);
+    border: 1.5px solid var(--node-border-inactive);
+    border-radius: 12px;
+    cursor: pointer;
+    min-width: 130px;
+    max-width: 170px;
+    padding: 14px 16px;
+    text-align: center;
+    transition: all 0.3s ease;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .agent-node:hover {
+    border-color: #4a5568;
+    background: #252a3f;
+  }
+
+  .agent-node.active {
+    background: rgba(108, 99, 255, 0.18);
+    border-color: var(--accent);
+    box-shadow: 0 0 20px rgba(108, 99, 255, 0.3), 0 0 40px rgba(108, 99, 255, 0.1);
+    transform: translateY(-2px);
+  }
+
+  .agent-node.selected {
+    border-color: var(--accent2);
+    box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.3);
+  }
+
+  .agent-node.active.orchestrator {
+    background: rgba(139, 92, 246, 0.22);
+    border-color: #8b5cf6;
+    box-shadow: 0 0 24px rgba(139, 92, 246, 0.4);
+  }
+
+  .node-icon {
+    font-size: 22px;
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  .node-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .agent-node.active .node-name { color: #c4b5fd; }
+
+  .node-desc {
+    font-size: 10px;
+    color: var(--text-muted);
+    line-height: 1.4;
+  }
+
+  .node-step {
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 10px;
+    padding: 1px 7px;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  .agent-node.active .node-step {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  /* parallel label */
+  .parallel-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    text-align: center;
+    padding: 4px 0;
+  }
+
+  /* detail panel */
+  .detail-panel {
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    padding: 20px 24px;
+    max-height: 240px;
+    overflow-y: auto;
+    transition: all 0.3s;
+  }
+
+  .detail-empty {
+    color: var(--text-muted);
+    font-size: 13px;
+    text-align: center;
+    padding: 16px;
+  }
+
+  .detail-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .detail-icon { font-size: 24px; }
+
+  .detail-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .detail-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    line-height: 1.5;
+  }
+
+  .detail-meta {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+
+  .meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .meta-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .meta-value {
+    font-size: 12px;
+    color: var(--text);
+  }
+
+  .detail-tasks {
+    margin-top: 10px;
+  }
+
+  .detail-tasks-title {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .task-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text);
+    padding: 3px 0;
+    line-height: 1.5;
+  }
+
+  .task-bullet {
+    color: var(--accent);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  /* routing explanation */
+  .routing-explain {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    min-height: 52px;
+  }
+
+  .routing-text {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  .routing-text.loading::after {
+    content: '...';
+    animation: dots 1s steps(4, end) infinite;
+  }
+
+  @keyframes dots {
+    0%, 20% { content: ''; }
+    40% { content: '.'; }
+    60% { content: '..'; }
+    80%, 100% { content: '...'; }
+  }
+
+  /* pulse animation for active nodes */
+  @keyframes nodePulse {
+    0% { box-shadow: 0 0 20px rgba(108,99,255,0.3), 0 0 40px rgba(108,99,255,0.1); }
+    50% { box-shadow: 0 0 28px rgba(108,99,255,0.5), 0 0 56px rgba(108,99,255,0.2); }
+    100% { box-shadow: 0 0 20px rgba(108,99,255,0.3), 0 0 40px rgba(108,99,255,0.1); }
+  }
+
+  .agent-node.active {
+    animation: nodePulse 2s ease-in-out infinite;
+  }
+
+  .agent-node.active.orchestrator {
+    animation: none;
+    box-shadow: 0 0 24px rgba(139, 92, 246, 0.5);
+  }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="/">에이전트 뷰어</a>
+  <span class="sep">/</span>
+  <a href="/graph">파이프라인 맵</a>
+  <span class="sep">/</span>
+  <h1>IT 파이프라인</h1>
+</header>
+
+<div class="layout">
+
+  <!-- ── Left Panel ── -->
+  <div class="left-panel">
+    <div class="panel-title">요청 입력</div>
+
+    <!-- example chips -->
+    <div class="chips">
+      <span class="chip-label" style="width:100%;padding:0;margin:0 0 4px">예시 요청:</span>
+      <button class="chip" data-req="새 서비스 만들기">새 서비스 만들기</button>
+      <button class="chip" data-req="기술 스택 추천해줘">기술 스택 추천</button>
+      <button class="chip" data-req="API 설계 도와줘">API 설계</button>
+      <button class="chip" data-req="보안 취약점 검토해줘">보안 검토</button>
+      <button class="chip" data-req="테스트 전략 수립해줘">테스트 전략</button>
+      <button class="chip" data-req="코드 구현 도와줘">코드 구현</button>
+    </div>
+
+    <!-- text input -->
+    <div class="request-area">
+      <div class="request-input-wrap">
+        <textarea id="request-input" placeholder="요청사항을 입력하세요&#10;예: 실시간 채팅 서비스 만들고 싶어"></textarea>
+        <button id="analyze-btn" title="분석 (Enter)">▶</button>
+      </div>
+    </div>
+
+    <!-- routing explain -->
+    <div class="routing-explain">
+      <div class="routing-text" id="routing-text">요청을 입력하면 어떤 에이전트가 처리하는지 보여드립니다.</div>
+    </div>
+
+    <!-- active agents -->
+    <div class="active-list">
+      <div class="active-list-title">에이전트 파이프라인</div>
+      <div id="agent-list"></div>
+    </div>
+  </div>
+
+  <!-- ── Right Panel ── -->
+  <div class="right-panel">
+
+    <!-- pipeline canvas -->
+    <div class="pipeline-canvas">
+      <div class="pipeline-flow" id="pipeline-flow">
+
+        <!-- Step 1: it-orchestrator -->
+        <div class="pipeline-row">
+          <div class="agent-node orchestrator" id="node-it-orchestrator" data-slug="it-orchestrator">
+            <span class="node-step">총괄</span>
+            <span class="node-icon">🎯</span>
+            <div class="node-name">it-orchestrator</div>
+            <div class="node-desc">요청 분석 & 파이프라인 조율</div>
+          </div>
+        </div>
+
+        <!-- connector -->
+        <div class="connector-v" id="conn-0"></div>
+
+        <!-- Step 2: tech-explorer -->
+        <div class="pipeline-row">
+          <div class="agent-node" id="node-tech-explorer" data-slug="tech-explorer">
+            <span class="node-step">Step 1</span>
+            <span class="node-icon">🔭</span>
+            <div class="node-name">tech-explorer</div>
+            <div class="node-desc">기술 후보군 탐색</div>
+          </div>
+        </div>
+
+        <div class="connector-v" id="conn-1"></div>
+
+        <!-- Step 3: tech-researcher -->
+        <div class="pipeline-row">
+          <div class="agent-node" id="node-tech-researcher" data-slug="tech-researcher">
+            <span class="node-step">Step 2</span>
+            <span class="node-icon">🔬</span>
+            <div class="node-name">tech-researcher</div>
+            <div class="node-desc">선택 기술 심층 조사</div>
+          </div>
+        </div>
+
+        <div class="connector-v" id="conn-2"></div>
+
+        <!-- Step 4: service-designer -->
+        <div class="pipeline-row">
+          <div class="agent-node" id="node-service-designer" data-slug="service-designer">
+            <span class="node-step">Step 3</span>
+            <span class="node-icon">🏗️</span>
+            <div class="node-name">service-designer</div>
+            <div class="node-desc">아키텍처 & API 설계</div>
+          </div>
+        </div>
+
+        <div class="connector-v" id="conn-3"></div>
+
+        <!-- Step 5: service-builder -->
+        <div class="pipeline-row">
+          <div class="agent-node" id="node-service-builder" data-slug="service-builder">
+            <span class="node-step">Step 4</span>
+            <span class="node-icon">⚙️</span>
+            <div class="node-name">service-builder</div>
+            <div class="node-desc">코드 생성 & 구현</div>
+          </div>
+        </div>
+
+        <div class="connector-v" id="conn-4"></div>
+
+        <!-- parallel label -->
+        <div class="parallel-label">병렬 실행</div>
+
+        <!-- Step 6: qa-engineer + security-dev (parallel) -->
+        <div class="pipeline-row" id="parallel-row" style="gap:40px;">
+          <div class="agent-node" id="node-qa-engineer" data-slug="qa-engineer">
+            <span class="node-step">Step 5A</span>
+            <span class="node-icon">🧪</span>
+            <div class="node-name">qa-engineer</div>
+            <div class="node-desc">테스트 & 품질 보증</div>
+          </div>
+          <div class="agent-node" id="node-security-dev" data-slug="security-dev">
+            <span class="node-step">Step 5B</span>
+            <span class="node-icon">🔒</span>
+            <div class="node-name">security-dev</div>
+            <div class="node-desc">보안 취약점 분석</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- detail panel -->
+    <div class="detail-panel" id="detail-panel">
+      <div class="detail-empty">에이전트를 클릭하면 상세 정보가 표시됩니다.</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── Agent metadata ──────────────────────────────────────────────────────────
+const AGENTS = {
+  "it-orchestrator": {
+    icon: "🎯",
+    name: "IT Orchestrator",
+    model: "opus",
+    description: "IT 서비스 개발 파이프라인의 총괄 조율자. 요청 유형을 분석해 기술 탐색부터 보안 검토까지 전체 파이프라인을 관리한다.",
+    tasks: [
+      "요청 유형 분류 (신규 서비스 / 기술 조사 / 구현 / QA / 보안)",
+      "필요 에이전트 선택 및 실행 순서 결정",
+      "에이전트 간 결과물 전달 조율",
+      "최종 결과 통합 및 전달"
+    ],
+    alwaysActive: true
+  },
+  "tech-explorer": {
+    icon: "🔭",
+    name: "Tech Explorer",
+    model: "sonnet",
+    description: "서비스 요구사항에 맞는 최신 기술/프레임워크/도구 후보군을 탐색하고 우선순위를 제안한다.",
+    tasks: [
+      "요구사항 분석 후 후보 기술 스택 도출",
+      "최신 트렌드 및 커뮤니티 동향 조사",
+      "기술 옵션별 장단점 비교표 작성",
+      "추천 스택 + 대안 2가지 제안"
+    ]
+  },
+  "tech-researcher": {
+    icon: "🔬",
+    name: "Tech Researcher",
+    model: "sonnet",
+    description: "선택된 기술 스택에 대한 심층 조사. 공식 문서, 베스트 프랙티스, 실제 사용 사례를 분석한다.",
+    tasks: [
+      "선택 기술 공식 문서 심층 분석",
+      "실제 프로덕션 사용 사례 조사",
+      "버전 호환성 및 의존성 확인",
+      "구현 시 주의사항 및 함정 정리"
+    ]
+  },
+  "service-designer": {
+    icon: "🏗️",
+    name: "Service Designer",
+    model: "opus",
+    description: "확정된 기술 스택을 바탕으로 기능 명세, 시스템 아키텍처, 데이터 모델, API를 설계한다.",
+    tasks: [
+      "기능 요구사항 명세서 작성",
+      "시스템 아키텍처 다이어그램 설계",
+      "데이터 모델 & ERD 설계",
+      "REST API / GraphQL 엔드포인트 정의"
+    ]
+  },
+  "service-builder": {
+    icon: "⚙️",
+    name: "Service Builder",
+    model: "sonnet",
+    description: "설계서를 바탕으로 실제 동작하는 코드와 프로젝트 구조를 생성하는 구현 전문 에이전트.",
+    tasks: [
+      "프로젝트 초기 구조 생성",
+      "핵심 기능 코드 구현",
+      "설정 파일 및 환경 구성",
+      "README 및 실행 가이드 작성"
+    ]
+  },
+  "qa-engineer": {
+    icon: "🧪",
+    name: "QA Engineer",
+    model: "sonnet",
+    description: "테스트 전략 수립, 테스트 코드 작성, 품질 게이트 관리를 담당하는 QA 전문 에이전트. 커버리지 80% 목표.",
+    tasks: [
+      "테스트 전략 및 계획 수립",
+      "단위/통합/E2E 테스트 코드 작성",
+      "CI 파이프라인 품질 게이트 설정",
+      "커버리지 리포트 및 개선 제안"
+    ]
+  },
+  "security-dev": {
+    icon: "🔒",
+    name: "Security Dev",
+    model: "sonnet",
+    description: "STRIDE 위협 모델링과 OWASP Top 10 기반 보안 취약점 분석 및 보안 강화 코드를 제공한다.",
+    tasks: [
+      "STRIDE 위협 모델링",
+      "OWASP Top 10 취약점 점검",
+      "인증/인가 보안 강화 코드",
+      "보안 헤더 및 입력 검증 구현"
+    ]
+  }
+};
+
+// ── Routing rules (local — no API needed for basic routing) ──────────────────
+const ROUTING_RULES = [
+  {
+    keywords: ["새 서비스", "만들기", "개발", "구축", "빌드", "build"],
+    agents: ["it-orchestrator", "tech-explorer", "tech-researcher", "service-designer", "service-builder", "qa-engineer", "security-dev"],
+    label: "신규 서비스 개발 → 전체 파이프라인 실행"
+  },
+  {
+    keywords: ["기술", "스택", "추천", "어떤", "framework", "언어"],
+    agents: ["it-orchestrator", "tech-explorer", "tech-researcher"],
+    label: "기술 조사 → 탐색 + 심층 조사"
+  },
+  {
+    keywords: ["api", "설계", "엔드포인트", "스키마", "아키텍처", "architect"],
+    agents: ["it-orchestrator", "tech-researcher", "service-designer"],
+    label: "설계 작업 → 조사 + 아키텍처 설계"
+  },
+  {
+    keywords: ["보안", "취약점", "owasp", "security", "인증", "권한"],
+    agents: ["it-orchestrator", "security-dev"],
+    label: "보안 검토 → 보안 전문 에이전트"
+  },
+  {
+    keywords: ["테스트", "qa", "품질", "커버리지", "test", "spec"],
+    agents: ["it-orchestrator", "qa-engineer"],
+    label: "테스트 전략 → QA 에이전트"
+  },
+  {
+    keywords: ["구현", "코드", "작성", "implement", "code", "coding"],
+    agents: ["it-orchestrator", "service-designer", "service-builder"],
+    label: "코드 구현 → 설계 + 구현"
+  }
+];
+
+const ALL_AGENTS_ORDER = [
+  "it-orchestrator", "tech-explorer", "tech-researcher",
+  "service-designer", "service-builder", "qa-engineer", "security-dev"
+];
+
+// ── State ────────────────────────────────────────────────────────────────────
+let activeAgents = new Set();
+let selectedAgent = null;
+let activeChip = null;
+
+// ── DOM helpers ──────────────────────────────────────────────────────────────
+function getNode(slug) { return document.getElementById(`node-${slug}`); }
+
+function getConnector(idx) { return document.getElementById(`conn-${idx}`); }
+
+// ── Activate agents ──────────────────────────────────────────────────────────
+function activateAgents(slugs, explanation) {
+  // reset
+  activeAgents.clear();
+  slugs.forEach(s => activeAgents.add(s));
+
+  // update nodes
+  ALL_AGENTS_ORDER.forEach(slug => {
+    const node = getNode(slug);
+    if (!node) return;
+    node.classList.toggle("active", activeAgents.has(slug));
+  });
+
+  // light up connectors based on which steps are active
+  const order = ["it-orchestrator", "tech-explorer", "tech-researcher", "service-designer", "service-builder"];
+  for (let i = 0; i < 4; i++) {
+    const conn = getConnector(i);
+    if (!conn) continue;
+    const bothActive = activeAgents.has(order[i]) && activeAgents.has(order[i+1]);
+    conn.classList.toggle("lit", bothActive);
+  }
+
+  // conn-4 (service-builder → parallel row): lit if builder active + either qa/security
+  const conn4 = getConnector(4);
+  if (conn4) {
+    conn4.classList.toggle("lit",
+      activeAgents.has("service-builder") &&
+      (activeAgents.has("qa-engineer") || activeAgents.has("security-dev"))
+    );
+  }
+
+  // update routing text
+  const rt = document.getElementById("routing-text");
+  rt.textContent = explanation || "";
+  rt.classList.remove("loading");
+
+  // update left list
+  renderAgentList();
+}
+
+function renderAgentList() {
+  const list = document.getElementById("agent-list");
+  list.innerHTML = "";
+
+  ALL_AGENTS_ORDER.forEach((slug, i) => {
+    const data = AGENTS[slug];
+    const isActive = activeAgents.has(slug);
+
+    const row = document.createElement("div");
+    row.className = `agent-row${isActive ? " active" : ""}`;
+    row.innerHTML = `
+      <div class="agent-dot"></div>
+      <div style="flex:1">
+        <div class="agent-row-name">${data.icon} ${slug}</div>
+        <div class="agent-row-role" style="font-size:10px;margin-top:1px">${data.description.slice(0,50)}…</div>
+      </div>
+      ${isActive ? `<div class="agent-row-badge">활성</div>` : ""}
+    `;
+    row.addEventListener("click", () => selectAgent(slug));
+    list.appendChild(row);
+  });
+}
+
+// ── Select agent (detail panel) ──────────────────────────────────────────────
+function selectAgent(slug) {
+  selectedAgent = slug;
+  const data = AGENTS[slug];
+  const panel = document.getElementById("detail-panel");
+
+  // update node selected state
+  ALL_AGENTS_ORDER.forEach(s => {
+    const n = getNode(s);
+    if (n) n.classList.toggle("selected", s === slug);
+  });
+
+  panel.innerHTML = `
+    <div class="detail-header">
+      <div class="detail-icon">${data.icon}</div>
+      <div>
+        <div class="detail-name">${data.name}</div>
+        <div class="detail-desc">${data.description}</div>
+      </div>
+    </div>
+    <div class="detail-meta">
+      <div class="meta-item">
+        <div class="meta-label">모델</div>
+        <div class="meta-value">${data.model}</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">상태</div>
+        <div class="meta-value" style="color:${activeAgents.has(slug) ? '#a78bfa' : '#64748b'}">${activeAgents.has(slug) ? '활성화됨' : '대기중'}</div>
+      </div>
+    </div>
+    <div class="detail-tasks">
+      <div class="detail-tasks-title">이 에이전트의 역할</div>
+      ${data.tasks.map(t => `
+        <div class="task-item">
+          <span class="task-bullet">▸</span>
+          <span>${t}</span>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+// ── Route request ────────────────────────────────────────────────────────────
+function routeRequest(req) {
+  const lower = req.toLowerCase();
+
+  for (const rule of ROUTING_RULES) {
+    if (rule.keywords.some(k => lower.includes(k))) {
+      return { agents: rule.agents, explanation: `"${req}" → ${rule.label}` };
+    }
+  }
+
+  // default: full pipeline
+  return {
+    agents: ALL_AGENTS_ORDER,
+    explanation: `"${req}" → 전체 파이프라인 실행 (기본값)`
+  };
+}
+
+function analyze(req) {
+  if (!req.trim()) return;
+
+  const rt = document.getElementById("routing-text");
+  rt.textContent = "라우팅 분석 중";
+  rt.classList.add("loading");
+
+  setTimeout(() => {
+    const result = routeRequest(req);
+    activateAgents(result.agents, result.explanation);
+  }, 400);
+}
+
+// ── Event listeners ──────────────────────────────────────────────────────────
+document.querySelectorAll(".chip").forEach(chip => {
+  chip.addEventListener("click", () => {
+    // toggle chip
+    document.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
+    chip.classList.add("active");
+
+    const req = chip.dataset.req;
+    document.getElementById("request-input").value = req;
+    analyze(req);
+  });
+});
+
+document.getElementById("analyze-btn").addEventListener("click", () => {
+  const req = document.getElementById("request-input").value;
+  document.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
+  analyze(req);
+});
+
+document.getElementById("request-input").addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    const req = e.target.value;
+    document.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
+    analyze(req);
+  }
+});
+
+// node click → detail
+document.querySelectorAll(".agent-node").forEach(node => {
+  node.addEventListener("click", () => {
+    const slug = node.dataset.slug;
+    selectAgent(slug);
+  });
+});
+
+// ── Init ────────────────────────────────────────────────────────────────────
+renderAgentList();
+</script>
+</body>
+</html>

@@ -1,0 +1,55 @@
+{
+  "manifest_version": 3,
+  "name": "SecureCode Auto-Fill",
+  "version": "1.0.0",
+  "description": "이메일로 수신된 보안코드를 웹페이지에 자동으로 입력해주는 익스텐션",
+
+  "permissions": [
+    "identity",
+    "storage",
+    "activeTab",
+    "alarms",
+    "notifications",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://www.googleapis.com/*",
+    "https://gmail.googleapis.com/*"
+  ],
+
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content/content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "SecureCode Auto-Fill"
+  },
+
+  "oauth2": {
+    "client_id": "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/gmail.readonly"
+    ]
+  },
+
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SecureCode Auto-Fill</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header>
+    <img src="../icons/icon48.png" alt="logo" class="logo" />
+    <div>
+      <h1>SecureCode</h1>
+      <p class="subtitle">보안코드 자동 입력기</p>
+    </div>
+  </header>
+
+  <!-- 상태 표시 -->
+  <section id="status-section" class="section">
+    <div id="status-badge" class="badge badge--idle">대기 중</div>
+    <p id="last-checked-text" class="muted">마지막 확인: -</p>
+  </section>
+
+  <!-- 감지된 코드 -->
+  <section id="code-section" class="section hidden">
+    <div class="code-box">
+      <span class="code-label">감지된 코드</span>
+      <span id="detected-code" class="code-value">------</span>
+      <button id="btn-copy" class="btn btn--sm">복사</button>
+    </div>
+    <p id="code-source" class="muted"></p>
+    <button id="btn-fill" class="btn btn--primary btn--full">현재 페이지에 입력</button>
+  </section>
+
+  <!-- 연결된 계정 -->
+  <section class="section">
+    <div class="section-header">
+      <h2>연결된 계정</h2>
+      <button id="btn-add-account" class="btn btn--sm btn--primary">+ Gmail 연결</button>
+    </div>
+    <ul id="account-list" class="account-list">
+      <li class="empty-state">연결된 계정이 없습니다</li>
+    </ul>
+  </section>
+
+  <!-- 설정 -->
+  <section class="section">
+    <h2>설정</h2>
+    <label class="toggle-row">
+      <span>자동 입력</span>
+      <input type="checkbox" id="toggle-auto-fill" checked />
+    </label>
+    <label class="toggle-row">
+      <span>감지 시 알림</span>
+      <input type="checkbox" id="toggle-notify" checked />
+    </label>
+    <label class="toggle-row">
+      <span>확인 주기</span>
+      <select id="select-interval">
+        <option value="30">30초</option>
+        <option value="60">1분</option>
+        <option value="120">2분</option>
+      </select>
+    </label>
+  </section>
+
+  <!-- 수동 폴링 -->
+  <button id="btn-poll" class="btn btn--full btn--ghost">지금 확인</button>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

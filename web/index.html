@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent Viewer</title>
+  <style>
+    /* ── Reset & Base ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0f1117;
+      --surface:   #1a1d27;
+      --border:    #2a2d3e;
+      --accent:    #6c63ff;
+      --accent2:   #00d4aa;
+      --text:      #e2e4f0;
+      --muted:     #6b7280;
+      --danger:    #ef4444;
+
+      --type-orchestrator: #f59e0b;
+      --type-analyst:      #3b82f6;
+      --type-reviewer:     #10b981;
+      --type-etf:          #06b6d4;
+      --type-reporter:     #a78bfa;
+      --type-builder:      #f97316;
+      --type-other:        #6b7280;
+    }
+
+    html, body { height: 100%; font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+
+    /* ── Layout ────────────────────────────────────────────────── */
+    .app { display: grid; grid-template-columns: 300px 1fr; grid-template-rows: 48px 1fr; height: 100vh; }
+
+    /* ── Header ────────────────────────────────────────────────── */
+    .header {
+      grid-column: 1 / -1;
+      display: flex; align-items: center; gap: 12px;
+      padding: 0 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .header-logo { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; }
+    .header-logo span { color: var(--accent); }
+    .header-count { font-size: 12px; color: var(--muted); background: var(--border); padding: 2px 8px; border-radius: 99px; }
+
+    /* ── Sidebar ───────────────────────────────────────────────── */
+    .sidebar {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+    .sidebar-search {
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-search input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 7px 12px;
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .sidebar-search input:focus { border-color: var(--accent); }
+    .sidebar-search input::placeholder { color: var(--muted); }
+
+    .sidebar-filters {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .filter-btn {
+      font-size: 11px; padding: 3px 8px; border-radius: 99px;
+      border: 1px solid var(--border); background: transparent;
+      color: var(--muted); cursor: pointer; transition: all 0.15s;
+    }
+    .filter-btn:hover, .filter-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+    .agent-list { overflow-y: auto; flex: 1; padding: 8px; }
+    .agent-list::-webkit-scrollbar { width: 4px; }
+    .agent-list::-webkit-scrollbar-track { background: transparent; }
+    .agent-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .agent-card {
+      padding: 10px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      margin-bottom: 4px;
+      transition: all 0.15s;
+    }
+    .agent-card:hover { background: var(--border); }
+    .agent-card.active { background: rgba(108, 99, 255, 0.12); border-color: var(--accent); }
+
+    .agent-card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .type-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+      background: var(--type-other);
+    }
+    .type-dot.orchestrator { background: var(--type-orchestrator); }
+    .type-dot.analyst      { background: var(--type-analyst); }
+    .type-dot.reviewer     { background: var(--type-reviewer); }
+    .type-dot.etf          { background: var(--type-etf); }
+    .type-dot.reporter     { background: var(--type-reporter); }
+    .type-dot.builder      { background: var(--type-builder); }
+
+    .agent-name { font-size: 13px; font-weight: 600; }
+    .model-badge {
+      margin-left: auto; font-size: 10px; padding: 1px 6px;
+      border-radius: 4px; background: var(--border); color: var(--muted);
+      flex-shrink: 0;
+    }
+    .agent-desc { font-size: 11px; color: var(--muted); line-height: 1.4;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+    /* ── Main ──────────────────────────────────────────────────── */
+    .main {
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+
+    .main-header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .main-title { font-size: 16px; font-weight: 700; }
+    .main-type-badge {
+      font-size: 11px; padding: 2px 8px; border-radius: 99px;
+      font-weight: 600; letter-spacing: 0.3px;
+    }
+    .main-type-badge.orchestrator { background: rgba(245,158,11,0.15); color: var(--type-orchestrator); }
+    .main-type-badge.analyst      { background: rgba(59,130,246,0.15); color: var(--type-analyst); }
+    .main-type-badge.reviewer     { background: rgba(16,185,129,0.15); color: var(--type-reviewer); }
+    .main-type-badge.etf          { background: rgba(6,182,212,0.15);  color: var(--type-etf); }
+    .main-type-badge.reporter     { background: rgba(167,139,250,0.15);color: var(--type-reporter); }
+    .main-type-badge.builder      { background: rgba(249,115,22,0.15); color: var(--type-builder); }
+    .main-type-badge.other        { background: var(--border); color: var(--muted); }
+
+    .main-actions { margin-left: auto; display: flex; gap: 8px; }
+    .btn {
+      padding: 6px 14px; border-radius: 7px; font-size: 12px; font-weight: 600;
+      border: none; cursor: pointer; transition: all 0.15s;
+    }
+    .btn-ghost { background: var(--border); color: var(--text); }
+    .btn-ghost:hover { background: #3a3d54; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #5a52e0; }
+    .btn-success { background: var(--accent2); color: #0f1117; }
+    .btn-success:hover { background: #00b893; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Content area ─────────────────────────────────────────── */
+    .content-area {
+      flex: 1; overflow: hidden;
+      display: grid; grid-template-rows: 1fr;
+    }
+    .content-area.has-diff { grid-template-rows: 1fr 1fr; }
+
+    .editor-pane {
+      display: flex; flex-direction: column; overflow: hidden;
+      border-bottom: 1px solid var(--border);
+    }
+    .pane-label {
+      padding: 6px 20px; font-size: 11px; font-weight: 600;
+      color: var(--muted); background: rgba(0,0,0,0.2);
+      letter-spacing: 0.5px; text-transform: uppercase; flex-shrink: 0;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .pane-label .save-indicator {
+      margin-left: auto; font-size: 11px; color: var(--accent2);
+      display: none;
+    }
+    .pane-label .save-indicator.visible { display: block; }
+
+    .editor-content {
+      flex: 1; overflow-y: auto; padding: 16px 20px;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 12.5px; line-height: 1.65; white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .editor-content::-webkit-scrollbar { width: 4px; }
+    .editor-content::-webkit-scrollbar-thumb { background: var(--border); }
+
+    /* Markdown-ish highlighting */
+    .editor-content .yaml-block { color: #888fac; }
+    .editor-content .h1 { color: #c9d1f5; font-weight: 700; font-size: 14px; }
+    .editor-content .h2 { color: #a9b4e8; font-weight: 600; }
+    .editor-content .h3 { color: #8a94d4; }
+    .editor-content .code { color: #7dd3c0; background: rgba(125,211,192,0.07); padding: 0 3px; border-radius: 3px; }
+    .editor-content .bold { color: #e2e4f0; font-weight: 700; }
+
+    .diff-pane { background: rgba(0,212,170,0.03); }
+
+    .empty-state {
+      flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 12px; color: var(--muted);
+    }
+    .empty-state-icon { font-size: 40px; opacity: 0.4; }
+    .empty-state-text { font-size: 14px; }
+    .empty-state-hint { font-size: 12px; opacity: 0.6; }
+
+    /* ── Edit bar ──────────────────────────────────────────────── */
+    .edit-bar {
+      flex-shrink: 0;
+      padding: 12px 16px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      display: flex; gap: 10px; align-items: flex-end;
+    }
+    .edit-bar-inner {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 14px;
+      display: flex; flex-direction: column; gap: 6px;
+      transition: border-color 0.15s;
+    }
+    .edit-bar-inner:focus-within { border-color: var(--accent); }
+    .edit-bar-label { font-size: 11px; color: var(--muted); }
+    .edit-input {
+      background: transparent; border: none; outline: none;
+      color: var(--text); font-size: 13px; width: 100%;
+      resize: none; line-height: 1.5; min-height: 36px; max-height: 120px;
+      font-family: inherit;
+    }
+    .edit-input::placeholder { color: var(--muted); }
+
+    .edit-actions { display: flex; flex-direction: column; gap: 6px; }
+
+    /* ── Loading overlay ───────────────────────────────────────── */
+    .spinner {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.2);
+      border-top-color: #fff; border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .toast {
+      position: fixed; bottom: 80px; right: 20px;
+      padding: 10px 16px; border-radius: 8px; font-size: 13px;
+      font-weight: 600; z-index: 1000;
+      animation: fadeIn 0.2s ease;
+    }
+    .toast.success { background: var(--accent2); color: #0f1117; }
+    .toast.error   { background: var(--danger); color: #fff; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-logo">Agent <span>Viewer</span></div>
+    <a style="font-size:13px;color:var(--muted);text-decoration:none;padding:4px 10px;border-radius:6px;transition:all 0.15s;" href="/graph"
+       onmouseover="this.style.background='var(--border)';this.style.color='var(--text)'"
+       onmouseout="this.style.background='';this.style.color='var(--muted)'">플로우 맵</a>
+    <a style="font-size:13px;color:var(--muted);text-decoration:none;padding:4px 10px;border-radius:6px;transition:all 0.15s;" href="/sessions"
+       onmouseover="this.style.background='var(--border)';this.style.color='var(--text)'"
+       onmouseout="this.style.background='';this.style.color='var(--muted)'">요청 히스토리</a>
+    <div class="header-count" id="agentCount">로딩 중…</div>
+  </header>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-search">
+      <input type="text" id="searchInput" placeholder="에이전트 검색…" />
+    </div>
+    <div class="sidebar-filters" id="filterRow">
+      <button class="filter-btn active" data-type="all">전체</button>
+      <button class="filter-btn" data-type="orchestrator">오케스트레이터</button>
+      <button class="filter-btn" data-type="analyst">분석가</button>
+      <button class="filter-btn" data-type="etf">ETF</button>
+      <button class="filter-btn" data-type="reviewer">리뷰어</button>
+      <button class="filter-btn" data-type="reporter">리포터</button>
+      <button class="filter-btn" data-type="builder">빌더</button>
+      <button class="filter-btn" data-type="other">기타</button>
+    </div>
+    <div class="agent-list" id="agentList">
+      <div style="padding:20px; color:var(--muted); text-align:center;">에이전트 로딩 중…</div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <!-- Main header -->
+    <div class="main-header" id="mainHeader" style="display:none">
+      <div class="main-title" id="mainTitle"></div>
+      <div class="main-type-badge" id="mainTypeBadge"></div>
+      <div class="main-actions">
+        <button class="btn btn-ghost" id="btnDiscard" style="display:none">변경 취소</button>
+        <button class="btn btn-success" id="btnSave" style="display:none">저장</button>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="content-area" id="contentArea">
+      <div class="empty-state">
+        <div class="empty-state-icon">🤖</div>
+        <div class="empty-state-text">에이전트를 선택하세요</div>
+        <div class="empty-state-hint">좌측 목록에서 에이전트를 클릭하면 내용을 볼 수 있습니다</div>
+      </div>
+    </div>
+
+    <!-- Edit bar -->
+    <div class="edit-bar" id="editBar" style="display:none">
+      <div class="edit-bar-inner">
+        <div class="edit-bar-label">수정 지시 → Claude가 파일을 직접 수정합니다</div>
+        <textarea class="edit-input" id="editInput"
+          placeholder="예: 롱 확률 계산 가중치를 기술적 50%, 펀더멘털 30%, 시장바이어스 20%로 변경해줘"
+          rows="2"></textarea>
+      </div>
+      <div class="edit-actions">
+        <button class="btn btn-ghost" id="btnPreview">미리보기</button>
+        <button class="btn btn-primary" id="btnApply">적용 및 저장</button>
+      </div>
+    </div>
+  </main>
+
+</div>
+
+<script>
+// ── State ───────────────────────────────────────────────────────────────────
+let agents = []
+let currentSlug = null
+let currentContent = ''
+let pendingContent = null
+let activeFilter = 'all'
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function toast(msg, type = 'success') {
+  const el = document.createElement('div')
+  el.className = `toast ${type}`
+  el.textContent = msg
+  document.body.appendChild(el)
+  setTimeout(() => el.remove(), 2800)
+}
+
+function highlight(text) {
+  // Simple syntax highlighting for markdown agent files
+  return text
+    .split('\n')
+    .map(line => {
+      if (line.startsWith('---')) return `<span class="yaml-block">${esc(line)}</span>`
+      if (/^(name|description|tools|model):/.test(line)) return `<span class="yaml-block">${esc(line)}</span>`
+      if (line.startsWith('# '))  return `<span class="h1">${esc(line)}</span>`
+      if (line.startsWith('## ')) return `<span class="h2">${esc(line)}</span>`
+      if (line.startsWith('### ')) return `<span class="h3">${esc(line)}</span>`
+      // Inline code
+      let l = esc(line)
+      l = l.replace(/`([^`]+)`/g, '<span class="code">$1</span>')
+      l = l.replace(/\*\*([^*]+)\*\*/g, '<span class="bold">$1</span>')
+      return l
+    })
+    .join('\n')
+}
+
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+}
+
+function typeBadgeText(type) {
+  const map = { orchestrator:'오케스트레이터', analyst:'분석가', reviewer:'리뷰어',
+                etf:'ETF', reporter:'리포터', builder:'빌더', other:'기타' }
+  return map[type] || type
+}
+
+// ── Render Sidebar ───────────────────────────────────────────────────────────
+function renderList() {
+  const q = document.getElementById('searchInput').value.toLowerCase()
+  const list = document.getElementById('agentList')
+
+  const filtered = agents.filter(a => {
+    const matchType = activeFilter === 'all' || a.type === activeFilter
+    const matchQ = !q || a.name.includes(q) || a.description.toLowerCase().includes(q)
+    return matchType && matchQ
+  })
+
+  if (!filtered.length) {
+    list.innerHTML = `<div style="padding:20px;color:var(--muted);text-align:center;">검색 결과 없음</div>`
+    return
+  }
+
+  list.innerHTML = filtered.map(a => `
+    <div class="agent-card ${a.slug === currentSlug ? 'active' : ''}"
+         data-slug="${a.slug}" onclick="selectAgent('${a.slug}')">
+      <div class="agent-card-top">
+        <div class="type-dot ${a.type}"></div>
+        <div class="agent-name">${esc(a.name)}</div>
+        ${a.model ? `<div class="model-badge">${esc(a.model)}</div>` : ''}
+      </div>
+      <div class="agent-desc">${esc(a.description)}</div>
+    </div>
+  `).join('')
+}
+
+// ── Load Agents ──────────────────────────────────────────────────────────────
+async function loadAgents() {
+  const res = await fetch('/api/agents')
+  agents = await res.json()
+  document.getElementById('agentCount').textContent = `${agents.length}개 에이전트`
+  renderList()
+}
+
+// ── Select Agent ─────────────────────────────────────────────────────────────
+async function selectAgent(slug) {
+  currentSlug = slug
+  pendingContent = null
+  renderList()
+
+  const res = await fetch(`/api/agents/${slug}`)
+  const data = await res.json()
+  currentContent = data.content
+
+  // Header
+  const header = document.getElementById('mainHeader')
+  header.style.display = 'flex'
+  document.getElementById('mainTitle').textContent = data.name
+  const badge = document.getElementById('mainTypeBadge')
+  badge.textContent = typeBadgeText(data.type)
+  badge.className = `main-type-badge ${data.type}`
+
+  document.getElementById('btnSave').style.display = 'none'
+  document.getElementById('btnDiscard').style.display = 'none'
+
+  // Content
+  renderContent(data.content, null)
+
+  // Edit bar
+  document.getElementById('editBar').style.display = 'flex'
+  document.getElementById('editInput').value = ''
+}
+
+// ── Render Content ────────────────────────────────────────────────────────────
+function renderContent(original, modified) {
+  const area = document.getElementById('contentArea')
+
+  if (!modified) {
+    area.className = 'content-area'
+    area.innerHTML = `
+      <div class="editor-pane">
+        <div class="pane-label">현재 파일</div>
+        <div class="editor-content">${highlight(original)}</div>
+      </div>`
+    return
+  }
+
+  area.className = 'content-area has-diff'
+  area.innerHTML = `
+    <div class="editor-pane">
+      <div class="pane-label">현재 파일</div>
+      <div class="editor-content">${highlight(original)}</div>
+    </div>
+    <div class="editor-pane diff-pane">
+      <div class="pane-label">
+        수정 미리보기
+        <span class="save-indicator visible">↑ 저장 버튼으로 적용</span>
+      </div>
+      <div class="editor-content">${highlight(modified)}</div>
+    </div>`
+}
+
+// ── Edit ──────────────────────────────────────────────────────────────────────
+async function runEdit(preview) {
+  const instruction = document.getElementById('editInput').value.trim()
+  if (!instruction) { toast('수정 내용을 입력하세요', 'error'); return }
+  if (!currentSlug)  { toast('에이전트를 먼저 선택하세요', 'error'); return }
+
+  const btn = preview ? document.getElementById('btnPreview') : document.getElementById('btnApply')
+  const origText = btn.textContent
+  btn.disabled = true
+  btn.innerHTML = `<span class="spinner"></span>`
+
+  try {
+    const res = await fetch(`/api/agents/${currentSlug}/edit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ instruction, preview }),
+    })
+    if (!res.ok) {
+      const err = await res.json()
+      throw new Error(err.detail || '서버 오류')
+    }
+    const data = await res.json()
+
+    if (preview) {
+      pendingContent = data.content
+      renderContent(currentContent, pendingContent)
+      document.getElementById('btnSave').style.display = 'inline-flex'
+      document.getElementById('btnDiscard').style.display = 'inline-flex'
+      toast('미리보기 생성 완료')
+    } else {
+      currentContent = data.content
+      pendingContent = null
+      renderContent(currentContent, null)
+      document.getElementById('btnSave').style.display = 'none'
+      document.getElementById('btnDiscard').style.display = 'none'
+      document.getElementById('editInput').value = ''
+      toast('저장 완료 ✓')
+    }
+  } catch (e) {
+    toast(e.message, 'error')
+  } finally {
+    btn.disabled = false
+    btn.textContent = origText
+  }
+}
+
+function discardPending() {
+  pendingContent = null
+  renderContent(currentContent, null)
+  document.getElementById('btnSave').style.display = 'none'
+  document.getElementById('btnDiscard').style.display = 'none'
+}
+
+async function savePending() {
+  if (!pendingContent) return
+  const res = await fetch(`/api/agents/${currentSlug}/edit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      instruction: document.getElementById('editInput').value || '미리보기 내용 저장',
+      preview: false,
+    }),
+  })
+  // 실제로는 이미 생성된 pendingContent를 직접 저장
+  // 간단하게 서버에 재요청 대신 content 직접 POST
+  await saveContent(pendingContent)
+}
+
+async function saveContent(content) {
+  // PUT endpoint로 직접 저장
+  const res = await fetch(`/api/agents/${currentSlug}/content`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  })
+  if (res.ok) {
+    currentContent = content
+    pendingContent = null
+    renderContent(currentContent, null)
+    document.getElementById('btnSave').style.display = 'none'
+    document.getElementById('btnDiscard').style.display = 'none'
+    document.getElementById('editInput').value = ''
+    toast('저장 완료 ✓')
+  } else {
+    toast('저장 실패', 'error')
+  }
+}
+
+// ── Filter & Search ───────────────────────────────────────────────────────────
+document.getElementById('filterRow').addEventListener('click', e => {
+  const btn = e.target.closest('.filter-btn')
+  if (!btn) return
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'))
+  btn.classList.add('active')
+  activeFilter = btn.dataset.type
+  renderList()
+})
+
+document.getElementById('searchInput').addEventListener('input', renderList)
+
+// ── Edit bar events ───────────────────────────────────────────────────────────
+document.getElementById('btnPreview').addEventListener('click', () => runEdit(true))
+document.getElementById('btnApply').addEventListener('click', () => runEdit(false))
+document.getElementById('btnDiscard').addEventListener('click', discardPending)
+document.getElementById('btnSave').addEventListener('click', savePending)
+
+// Enter in textarea → Ctrl+Enter to submit
+document.getElementById('editInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault()
+    runEdit(false)
+  }
+})
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+loadAgents()
+</script>
+</body>
+</html>

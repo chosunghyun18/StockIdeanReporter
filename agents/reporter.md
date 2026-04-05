@@ -1,8 +1,10 @@
 ---
 name: reporter
-description: Slack 리포트 전송 전문 에이전트. 투자 아이디어를 Slack 메시지 포맷으로 변환하고 전송한다. orchestrator에 의해 호출됨.
+description: 분석 결과를 Slack Block Kit 포맷으로 변환해 전송하는 최종 출력 에이전트.
 tools: ["Read", "Write", "Bash"]
 model: haiku
+inputs: [output/investment_idea_{ticker}_{date}.md, output/etf_portfolio_{date}.md, output/market_bias_{date}.md]
+outputs: [output/slack_sent_{ticker}_{date}.log]
 ---
 
 # Slack 리포트 에이전트
