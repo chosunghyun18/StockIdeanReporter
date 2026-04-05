@@ -15,6 +15,17 @@ cleanup() {
 }
 trap cleanup SIGINT SIGTERM
 
+# .env 로드
+if [ -f "$ROOT_DIR/.env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$ROOT_DIR/.env"
+  set +a
+  echo "[환경변수] $ROOT_DIR/.env 로드 완료"
+else
+  echo "[경고] .env 파일을 찾을 수 없습니다: $ROOT_DIR/.env"
+fi
+
 # 백엔드
 echo "[백엔드] uvicorn 시작 (http://localhost:8000)"
 cd "$BACKEND_DIR"

@@ -13,3 +13,6 @@ export const fetchResult = (ticker) =>
 
 export const sendToSlack = (ticker, content, reportFields = null) =>
   http.post('/slack/send', { ticker, content, report_fields: reportFields }).then(r => r.data)
+
+export const discoverStocks = (markets, topN) =>
+  http.post('/discover', { markets, top_n: topN }).then(r => r.data)

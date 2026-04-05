@@ -14,6 +14,13 @@ import sys
 from pathlib import Path
 from typing import Any
 
+# start.sh가 .env를 export하지 않은 환경에서도 동작하도록 fallback 로드
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).parent.parent / ".env")
+except ImportError:
+    pass  # python-dotenv 미설치 시 start.sh의 source .env에 의존
+
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -63,6 +70,17 @@ class AnalyzeResponse(BaseModel):
     investment_idea: str | None = None
     error: str | None = None
     slack_sent: bool = False
+
+
+class DiscoverRequest(BaseModel):
+    markets: list[str] = ["KR", "US"]
+    top_n: int = 5
+
+
+class DiscoverResponse(BaseModel):
+    status: str
+    total: int
+    results: list[AnalyzeResponse]
 
 
 class ResultSummary(BaseModel):
@@ -171,6 +189,36 @@ async def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
         investment_idea=result.investment_idea,
         slack_sent=result.slack_sent,
     )
+
+
+@app.post("/api/discover", response_model=DiscoverResponse)
+async def discover(req: DiscoverRequest) -> DiscoverResponse:
+    """종목 자동 발굴 — 스크리닝 후 상위 N개 종목 전체 분석."""
+    valid_markets = [m for m in req.markets if m in ("KR", "US")]
+    if not valid_markets:
+        raise HTTPException(status_code=422, detail="markets는 KR, US 중 하나 이상이어야 합니다.")
+    top_n = max(1, min(req.top_n, 20))
+
+    logger.info("자동 발굴 요청: markets=%s top_n=%d", valid_markets, top_n)
+    orchestrator = Orchestrator()
+    try:
+        raw_results = orchestrator.run_discovery(markets=valid_markets, top_n=top_n)
+    except Exception as exc:
+        logger.exception("발굴 중 예외: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    results = [
+        AnalyzeResponse(
+            ticker=r.ticker,
+            market=r.market,
+            status="error" if r.error else "success",
+            investment_idea=r.investment_idea or None,
+            error=r.error,
+            slack_sent=r.slack_sent,
+        )
+        for r in raw_results
+    ]
+    return DiscoverResponse(status="success", total=len(results), results=results)
 
 
 @app.post("/api/slack/send")

@@ -10,14 +10,16 @@
 
     <main class="app-main">
       <div class="left-panel">
-        <StockAnalyzer @result="handleResult" />
-        <ResultHistory @select="handleResult" />
+        <StockAnalyzer @result="handleSingleResult" />
+        <DiscoveryPanel @result="handleDiscoveryResult" />
+        <ResultHistory @select="handleSingleResult" />
       </div>
 
       <div class="right-panel">
-        <AnalysisResult :result="currentResult" />
-        <div v-if="!currentResult" class="placeholder">
-          <span>종목 코드를 입력하고 분석을 실행하거나<br>왼쪽 목록에서 과거 결과를 선택하세요.</span>
+        <DiscoveryResult v-if="viewMode === 'discovery'" :result="discoveryResult" />
+        <AnalysisResult v-else-if="viewMode === 'single'" :result="singleResult" />
+        <div v-else class="placeholder">
+          <span>종목 코드를 입력해 개별 분석하거나<br>자동 발굴로 다종목 인사이트를 받으세요.</span>
         </div>
       </div>
     </main>
@@ -29,11 +31,21 @@ import { ref } from 'vue'
 import StockAnalyzer from './components/StockAnalyzer.vue'
 import AnalysisResult from './components/AnalysisResult.vue'
 import ResultHistory from './components/ResultHistory.vue'
+import DiscoveryPanel from './components/DiscoveryPanel.vue'
+import DiscoveryResult from './components/DiscoveryResult.vue'
 
-const currentResult = ref(null)
+const viewMode = ref(null)   // null | 'single' | 'discovery'
+const singleResult = ref(null)
+const discoveryResult = ref(null)
 
-function handleResult(result) {
-  currentResult.value = result
+function handleSingleResult(result) {
+  singleResult.value = result
+  viewMode.value = 'single'
+}
+
+function handleDiscoveryResult(result) {
+  discoveryResult.value = result
+  viewMode.value = 'discovery'
 }
 </script>
 
