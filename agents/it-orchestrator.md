@@ -34,6 +34,21 @@ service-builder ──┬── qa-engineer
                   └── security-dev
 ```
 
+## 서브에이전트 호출 방법
+
+각 하위 에이전트는 **`Agent` 도구로 `general-purpose` 타입**을 사용하여 호출한다.
+호출 시 반드시 해당 에이전트의 `.md` 파일 내용을 Read 도구로 먼저 읽은 뒤 프롬프트에 포함시킨다.
+
+```
+# 호출 패턴
+Agent(
+  subagent_type="general-purpose",
+  prompt="[agents/tech-explorer.md 전체 내용]\n\n---\n요청: 서비스명=..., 목적=..."
+)
+```
+
+5단계(qa-engineer + security-dev)는 한 번의 응답에서 두 Agent 호출을 동시에 발행하여 병렬 실행한다.
+
 ## 책임
 1. 사용자 요청을 분석하여 어떤 에이전트를 호출할지 결정
 2. 각 에이전트 결과를 다음 에이전트에 컨텍스트로 전달

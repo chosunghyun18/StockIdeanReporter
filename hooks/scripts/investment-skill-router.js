@@ -61,6 +61,16 @@ process.stdin.on('end', () => {
       label: '코드 리뷰 에이전트',
       path: 'agents/code-reviewer.md',
     },
+    {
+      keywords: [
+        'it-orchestrator', '서비스 만들', '서비스 개발', '서비스 구현',
+        '웹앱', '웹 앱', 'web app', 'rest api', '백엔드 구현', '백엔드 만들',
+        'tech stack', '기술 스택', '스택 선정', '아키텍처 설계',
+        'service builder', 'service designer', 'qa engineer', 'security dev',
+      ],
+      label: 'IT 서비스 개발 팀 오케스트레이터',
+      path: 'agents/it-orchestrator.md',
+    },
   ];
 
   const matched = skillMap.filter((s) =>

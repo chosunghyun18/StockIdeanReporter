@@ -45,6 +45,21 @@ outputs: []
 
 ---
 
+## 서브에이전트 호출 방법
+
+각 하위 에이전트는 **`Agent` 도구로 `general-purpose` 타입**을 사용하여 호출한다.
+호출 시 반드시 해당 에이전트의 `.md` 파일 내용을 Read 도구로 먼저 읽은 뒤 프롬프트에 포함시킨다.
+
+```
+# 호출 패턴
+Agent(
+  subagent_type="general-purpose",
+  prompt="[agents/market-bias-analyst.md 전체 내용]\n\n---\n입력: ticker=AAPL, market=US"
+)
+```
+
+병렬 호출이 필요한 경우 (industry-analyst + price-analyst) 한 번의 응답에서 두 Agent 호출을 동시에 발행한다.
+
 ## 실행 원칙
 
 - `market-bias-analyst`는 **항상 가장 먼저** 실행 (모든 배팅 크기의 전제)
