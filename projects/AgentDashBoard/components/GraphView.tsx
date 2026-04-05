@@ -23,12 +23,18 @@ interface Edge {
   parallel: boolean
 }
 
+interface PipelineStep {
+  agents: string[]
+  parallel: boolean
+  label?: string
+}
+
 interface Pipeline {
   id: string
-  name: string
+  label: string
   description?: string
   color?: string
-  steps?: string[]
+  steps?: PipelineStep[]
 }
 
 interface GraphData {
@@ -116,7 +122,7 @@ export default function GraphView() {
   ) {
     if (!svgRef.current) return
     const pipeline = pid ? g.pipelines.find((p) => p.id === pid) : null
-    const stepSlugs: string[] = pipeline?.steps ?? []
+    const stepSlugs: string[] = pipeline?.steps?.flatMap((s) => s.agents) ?? []
     const nodes = stepSlugs
       .map((s) => g.nodes.find((n) => n.slug === s))
       .filter((n): n is Node => !!n)
@@ -206,7 +212,14 @@ export default function GraphView() {
 
     type SimNode = Node & d3.SimulationNodeDatum & { x: number; y: number }
     const nodeMap = new Map(g.nodes.map((n) => [n.slug, n]))
-    const simNodes: SimNode[] = g.nodes.map((n) => ({ ...n, x: W / 2, y: H / 2 }))
+
+    // Spread initial positions randomly to avoid degenerate force start
+    const simNodes: SimNode[] = g.nodes.map((n, i) => {
+      const angle = (i / g.nodes.length) * 2 * Math.PI
+      const r = Math.min(W, H) * 0.35
+      return { ...n, x: W / 2 + r * Math.cos(angle), y: H / 2 + r * Math.sin(angle) }
+    })
+
     const simEdges = g.edges.map((e) => ({
       ...e,
       source: typeof e.source === 'string' ? e.source : (e.source as Node).slug,
@@ -214,10 +227,10 @@ export default function GraphView() {
     }))
 
     const sim = d3.forceSimulation<SimNode>(simNodes)
-      .force('link', d3.forceLink(simEdges).id((d: unknown) => (d as Node).slug).distance(160))
-      .force('charge', d3.forceManyBody().strength(-400))
+      .force('link', d3.forceLink(simEdges).id((d: unknown) => (d as Node).slug).distance(120))
+      .force('charge', d3.forceManyBody().strength(-300))
       .force('center', d3.forceCenter(W / 2, H / 2))
-      .force('collision', d3.forceCollide(70))
+      .force('collision', d3.forceCollide(55))
 
     const link = root.append('g')
       .selectAll('line')
@@ -261,15 +274,46 @@ export default function GraphView() {
       .attr('font-weight', 600)
       .text((d) => d.name.length > 14 ? d.name.slice(0, 13) + '…' : d.name)
 
-    sim.on('tick', () => {
+    const updatePositions = () => {
       link
         .attr('x1', (d: unknown) => ((d as { source: { x: number } }).source.x))
         .attr('y1', (d: unknown) => ((d as { source: { y: number } }).source.y))
         .attr('x2', (d: unknown) => ((d as { target: { x: number } }).target.x))
         .attr('y2', (d: unknown) => ((d as { target: { y: number } }).target.y))
-
       node.attr('transform', (d) => `translate(${d.x},${d.y})`)
-    })
+    }
+
+    // Run synchronously to final layout, then zoom-to-fit so disconnected clusters are visible
+    sim.stop()
+    for (let i = 0; i < 300; i++) sim.tick()
+    updatePositions()
+
+    // Compute bounding box of all nodes and fit in viewport
+    const PAD = 60
+    const R = 28
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+    for (const n of simNodes) {
+      x0 = Math.min(x0, n.x - R)
+      y0 = Math.min(y0, n.y - R)
+      x1 = Math.max(x1, n.x + R)
+      y1 = Math.max(y1, n.y + R)
+    }
+    const bw = x1 - x0 || 1
+    const bh = y1 - y0 || 1
+    const scale = Math.min((W - PAD * 2) / bw, (H - PAD * 2) / bh, 1.2)
+    const tx = W / 2 - scale * (x0 + bw / 2)
+    const ty = H / 2 - scale * (y0 + bh / 2)
+
+    if (zoomRef.current) {
+      d3.select(svgEl).call(
+        zoomRef.current.transform,
+        d3.zoomIdentity.translate(tx, ty).scale(scale)
+      )
+    }
+
+    // Restart for drag interactivity
+    sim.alpha(0.1).restart()
+    sim.on('tick', updatePositions)
   }
 
   function zoomIn() {
@@ -306,7 +350,7 @@ export default function GraphView() {
               >
                 <div className={styles.pItemTop}>
                   <div className={styles.pDot} style={{ background: p.color || '#6c63ff' }} />
-                  <div className={styles.pName}>{p.name}</div>
+                  <div className={styles.pName}>{p.label}</div>
                 </div>
                 {p.description && <div className={styles.pMeta}>{p.description}</div>}
               </div>

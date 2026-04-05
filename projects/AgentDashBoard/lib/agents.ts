@@ -2,9 +2,9 @@ import fs from 'fs'
 import path from 'path'
 
 const BASE_DIR = path.resolve(process.cwd(), '..')
-export const AGENTS_DIR = path.resolve(BASE_DIR, 'agents')
-export const PIPELINES_FILE = path.resolve(BASE_DIR, 'config', 'pipelines.json')
-export const SESSIONS_FILE = path.resolve(BASE_DIR, 'output', 'sessions.jsonl')
+export const AGENTS_DIR = process.env.AGENTS_DIR ?? path.resolve(BASE_DIR, 'agents')
+export const PIPELINES_FILE = process.env.PIPELINES_FILE ?? path.resolve(BASE_DIR, 'config', 'pipelines.json')
+export const SESSIONS_FILE = process.env.SESSIONS_FILE ?? path.resolve(BASE_DIR, 'output', 'sessions.jsonl')
 
 export interface AgentMeta {
   slug: string
