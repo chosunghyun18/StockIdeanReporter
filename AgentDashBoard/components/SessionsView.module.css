@@ -1,0 +1,268 @@
+.body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  height: calc(100vh - 48px);
+}
+
+/* ── Session List ── */
+.sessionList {
+  width: 320px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.listHeader {
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.listTitle {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.listHint { font-size: 10px; color: var(--muted); opacity: 0.6; }
+
+.listScroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.sessionItem {
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-bottom: 4px;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+}
+
+.sessionItem:hover { background: var(--surface2); }
+.sessionItem.active {
+  background: rgba(108,99,255,0.12);
+  border-color: rgba(108,99,255,0.4);
+}
+
+.siTime {
+  font-size: 10px;
+  color: var(--muted);
+  margin-bottom: 4px;
+  font-family: 'SF Mono', monospace;
+}
+
+.siPrompt {
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 6px;
+}
+
+.sessionItem.active .siPrompt { color: #c4b5fd; }
+
+.siAgents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.siAgentDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.emptyIcon { font-size: 32px; margin-bottom: 12px; }
+
+/* ── Right Panel ── */
+.rightPanel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Detail Header ── */
+.detailHeader {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  min-height: 72px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.detailPromptIcon { font-size: 18px; margin-top: 2px; flex-shrink: 0; }
+.detailPromptWrap { flex: 1; }
+
+.detailPromptLabel {
+  font-size: 10px;
+  color: var(--muted);
+  margin-bottom: 4px;
+  letter-spacing: 0.5px;
+}
+
+.detailPromptText {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.5;
+  max-height: 64px;
+  overflow: hidden;
+}
+
+.detailTime {
+  font-size: 10px;
+  color: var(--muted);
+  font-family: 'SF Mono', monospace;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
+/* ── Agent Canvas ── */
+.agentCanvas {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.pipelineGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pipelineGroupLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pipelineGroupLabel::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.agentRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.agentCard {
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  min-width: 148px;
+  max-width: 220px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  position: relative;
+  opacity: 0.4;
+}
+
+.agentCard.agentCardActive {
+  opacity: 1;
+  transform: translateY(-2px);
+}
+
+.agentCard.agentCardActive::before {
+  content: '';
+  position: absolute;
+  inset: -1.5px;
+  border-radius: 11px;
+  border: 1.5px solid var(--card-color, var(--accent));
+  box-shadow: 0 0 16px color-mix(in srgb, var(--card-color, var(--accent)) 40%, transparent);
+  pointer-events: none;
+}
+
+.acBadge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 9px;
+  font-weight: 700;
+  background: var(--card-color, var(--accent));
+  color: #fff;
+  border-radius: 4px;
+  padding: 1px 5px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.agentCard.agentCardActive .acBadge { opacity: 1; }
+
+.acName {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 3px;
+}
+
+.agentCard.agentCardActive .acName { color: #c4b5fd; }
+
+.acDesc {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── Select hint ── */
+.selectHint {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--muted);
+}
+
+.selectHintIcon { font-size: 40px; }
+
+.selectHintText {
+  font-size: 13px;
+  line-height: 1.8;
+  text-align: center;
+}

@@ -1,0 +1,157 @@
+.body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  height: calc(100vh - 48px);
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 240px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.sidebarSection {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sectionLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.tabRow { display: flex; gap: 3px; }
+.tabBtn {
+  flex: 1;
+  padding: 5px 0;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  color: var(--muted);
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.tabBtn:hover  { background: var(--border); color: var(--text); }
+.tabBtn.active { background: var(--accent); color: #fff; }
+
+.pipelineList {
+  overflow-y: auto;
+  flex: 1;
+  padding: 8px;
+}
+
+.pItem {
+  padding: 9px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  margin-bottom: 4px;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+}
+.pItem:hover      { background: var(--border); }
+.pItemActive      { border-color: var(--accent); background: rgba(108,99,255,0.1); }
+
+.pItemTop { display: flex; align-items: center; gap: 7px; }
+.pDot     { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.pName    { font-size: 12px; font-weight: 600; }
+.pMeta    { font-size: 10px; color: var(--muted); margin-top: 3px; padding-left: 15px; line-height: 1.4; }
+
+.legend {
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+}
+.lRow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 5px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.lDot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* ── Canvas ── */
+.canvas {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.svg {
+  width: 100%;
+  height: 100%;
+}
+
+.edge {
+  fill: none;
+  stroke-width: 1.5;
+}
+
+/* ── Controls ── */
+.controls {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.ctrl {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  font-size: 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+.ctrl:hover { background: var(--border); }
+
+/* ── Tooltip ── */
+.tooltip {
+  position: fixed;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  max-width: 270px;
+  pointer-events: none;
+  z-index: 200;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+  animation: fadeInUp 0.12s ease;
+}
+
+.tipName  { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
+.tipType  { font-size: 10px; margin-bottom: 6px; opacity: 0.9; }
+.tipDesc  { font-size: 11px; color: var(--muted); margin-bottom: 8px; line-height: 1.45; }
+.tipModel {
+  font-size: 10px;
+  background: var(--border);
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-top: 4px;
+}
+
+.tipContract      { font-size: 10px; margin-top: 6px; }
+.tipContractLabel { color: var(--muted); margin-bottom: 2px; }
+.tipContractItem  { color: #a0a8c0; font-family: monospace; font-size: 9.5px; margin-left: 4px; }
