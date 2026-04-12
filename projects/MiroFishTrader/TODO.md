@@ -110,8 +110,10 @@ S&P500 선물 / SPY ETF 매매 판단을 자동 생성하는 시스템.
 ```
 MiroFishTrader/
 ├── data/
-│   ├── collector.py      # 데이터 수집
-│   └── processor.py      # 정제 및 변환
+│   ├── collector.py          # 주가 데이터 수집 (yfinance)
+│   ├── reddit_collector.py   # Reddit asyncpraw 수집
+│   ├── reddit_processor.py   # 센티먼트 분석 (키워드 + Claude)
+│   └── processor.py          # 정제 및 변환
 ├── signals/
 │   └── indicators.py     # RSI, MACD 등
 ├── agents/
