@@ -13,7 +13,9 @@ set -euo pipefail
 # ── 경로 설정 ─────────────────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV="$SCRIPT_DIR/.venv"
-MIROFISH_DIR="$SCRIPT_DIR/MiroFish"   # MiroFish 소스 위치 (git clone 경로)
+# MiroFish 소스 위치: 환경변수 > 스크립트 옆 MiroFish 폴더 순으로 탐색
+# git clone https://github.com/666ghj/MiroFish <여기>
+MIROFISH_DIR="${MIROFISH_SOURCE_DIR:-$SCRIPT_DIR/MiroFish}"
 MIROFISH_URL="${MIROFISH_BASE_URL:-http://localhost:5001}"
 MIROFISH_HEALTH_PATH="/health"
 MIROFISH_WAIT_SEC=60                   # 최대 대기 시간(초)
@@ -76,27 +78,42 @@ if [[ $SKIP_MIROFISH -eq 1 ]]; then
 elif _mirofish_running; then
     info "MiroFish 이미 실행 중: ${MIROFISH_URL}"
 else
-    if [[ ! -d "$MIROFISH_DIR" ]]; then
-        warn "MiroFish 소스 디렉터리가 없습니다: $MIROFISH_DIR"
-        warn "MiroFish를 먼저 클론하세요:"
-        warn "  git clone https://github.com/666ghj/MiroFish $MIROFISH_DIR"
-        warn "또는 --no-mirofish 옵션으로 외부 실행 서버를 사용하세요."
-        exit 1
-    fi
-
     if ! command -v docker &> /dev/null; then
         error "Docker가 설치되어 있지 않습니다."
         exit 1
     fi
 
-    info "MiroFish Docker 컨테이너 기동 중..."
-    if [[ -f "$MIROFISH_DIR/docker-compose.yml" ]] || [[ -f "$MIROFISH_DIR/compose.yml" ]]; then
-        docker compose -f "$MIROFISH_DIR/docker-compose.yml" up -d 2>/dev/null \
-            || docker compose -f "$MIROFISH_DIR/compose.yml" up -d
-    else
-        error "docker-compose.yml 파일을 찾을 수 없습니다: $MIROFISH_DIR"
+    # docker-compose.yml 탐색 (지정 디렉터리 → 현재 디렉터리)
+    COMPOSE_FILE=""
+    for candidate in \
+        "$MIROFISH_DIR/docker-compose.yml" \
+        "$MIROFISH_DIR/compose.yml" \
+        "$SCRIPT_DIR/docker-compose.yml" \
+        "$SCRIPT_DIR/compose.yml"
+    do
+        if [[ -f "$candidate" ]]; then
+            COMPOSE_FILE="$candidate"
+            break
+        fi
+    done
+
+    if [[ -z "$COMPOSE_FILE" ]]; then
+        error "docker-compose.yml 파일을 찾을 수 없습니다."
+        error ""
+        error "해결 방법 1 — MiroFish 소스 클론:"
+        error "  git clone https://github.com/666ghj/MiroFish $SCRIPT_DIR/MiroFish"
+        error "  ./run.sh"
+        error ""
+        error "해결 방법 2 — 소스 위치를 직접 지정:"
+        error "  MIROFISH_SOURCE_DIR=/path/to/MiroFish ./run.sh"
+        error ""
+        error "해결 방법 3 — 이미 실행 중인 서버 사용:"
+        error "  ./run.sh --no-mirofish"
         exit 1
     fi
+
+    info "MiroFish Docker 컨테이너 기동 중... ($COMPOSE_FILE)"
+    docker compose -f "$COMPOSE_FILE" up -d
 
     info "MiroFish 서버 준비 대기 (최대 ${MIROFISH_WAIT_SEC}초)..."
     elapsed=0
